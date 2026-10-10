@@ -1,4 +1,4 @@
-# Bistró Gourmet — Restaurante y Comida en Línea (Delivery & Pickup)
+# Restaurante y Comida en Línea (Delivery & Pickup)
 ## E-Commerce Distribuido con Capa de Seguridad y Auditoría Forense
 
 **Universidad Mariano Gálvez de Guatemala**  
