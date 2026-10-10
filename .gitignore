@@ -1,0 +1,15 @@
+# Environment / Credentials
+.env
+*.log
+
+# Docker data directories if mounted locally
+data/
+vendor/
+node_modules/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

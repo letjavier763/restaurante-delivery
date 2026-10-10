@@ -1,0 +1,450 @@
+/* ==============================================================================
+   BISTRÓ GOURMET - TABLER UI LIGHT DESIGN & RESTAURANT FOOD STYLING
+   Delivery & Pickup, Menú de Autor, KDS de Cocina y Fondo Claro Premium
+   ============================================================================== */
+
+/* Google Fonts - Inter & Playfair Display para toques gourmet */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+    --tblr-primary: #e11d48;
+    --tblr-primary-rgb: 225, 29, 72;
+    --tblr-cyan: #0891b2;
+    --tblr-emerald: #059669;
+    --tblr-amber: #d97706;
+    --tblr-body-bg: #f8fafc;
+    --tblr-card-bg: #ffffff;
+    --tblr-border-color: #e2e8f0;
+    --technova-transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── BASE ─────────────────────────────────────────────────────── */
+body {
+    background-color: #f8fafc !important;
+    color: #1e293b;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 0.875rem;
+    -webkit-font-smoothing: antialiased;
+}
+
+.font-monospace,
+code,
+pre {
+    font-family: 'JetBrains Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace !important;
+}
+
+/* ── NAVBAR ───────────────────────────────────────────────────── */
+.navbar.bg-white {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── TARJETAS PRINCIPALES ────────────────────────────────────── */
+.card-tech {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 10px;
+    box-shadow:
+        0 1px 3px 0 rgba(0, 0, 0, 0.06),
+        0 1px 2px -1px rgba(0, 0, 0, 0.04);
+    transition: transform var(--technova-transition),
+                box-shadow var(--technova-transition),
+                border-color var(--technova-transition);
+}
+
+.card-tech:hover {
+    transform: translateY(-4px);
+    border-color: #c7d2fe !important;
+    box-shadow:
+        0 12px 24px -6px rgba(79, 70, 229, 0.1),
+        0 4px 8px -4px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* ── TARJETA KPI ESPECIAL ────────────────────────────────────── */
+.card-kpi {
+    border-top: 3px solid var(--tblr-primary);
+}
+
+/* ── IMAGEN DE PRODUCTO ──────────────────────────────────────── */
+.product-img-wrapper {
+    height: 200px;
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    overflow: hidden;
+    position: relative;
+    border-top-left-radius: inherit;
+    border-top-right-radius: inherit;
+}
+
+.product-img-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-tech:hover .product-img-wrapper img {
+    transform: scale(1.07);
+}
+
+/* ── SPEC TAGS ───────────────────────────────────────────────── */
+.spec-tag {
+    font-size: 0.68rem;
+    font-family: 'JetBrains Mono', monospace;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 0.12rem 0.5rem;
+    transition: background-color 0.2s;
+}
+
+.spec-tag:hover {
+    background: #e0e7ff;
+    color: #4f46e5;
+    border-color: #c7d2fe;
+}
+
+/* ── JSON BOX FORENSE ────────────────────────────────────────── */
+.json-box {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: #38bdf8;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.6;
+}
+
+.json-box::-webkit-scrollbar { width: 5px; }
+.json-box::-webkit-scrollbar-track { background: #1e293b; }
+.json-box::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+/* ── STATUS PULSE ANIMATION ──────────────────────────────────── */
+.status-dot-pulse {
+    width: 8px;
+    height: 8px;
+    background: #10b981;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    animation: pulseDot 2s infinite;
+}
+
+@keyframes pulseDot {
+    0%   { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70%  { transform: scale(1);    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* ── TOAST FLOTANTE ──────────────────────────────────────────── */
+.tabler-toast-custom {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    min-width: 320px;
+    max-width: 420px;
+    box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.18);
+    border-radius: 10px;
+    border-left: 4px solid currentColor;
+}
+
+/* ── ANIMACIÓN DE ENTRADA PARA TABS ──────────────────────────── */
+@keyframes tabFadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.tab-active-anim {
+    animation: tabFadeIn 0.3s ease forwards;
+}
+
+/* ── NAVBAR TABS PREMIUM ─────────────────────────────────────── */
+.nav-tabs .nav-link {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: #64748b;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 0.6rem 0.9rem;
+    white-space: nowrap;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.nav-tabs .nav-link:hover {
+    color: #4f46e5;
+}
+
+.nav-tabs .nav-link.active {
+    color: #4f46e5;
+    border-bottom-color: #4f46e5;
+    background: transparent;
+}
+
+/* ── ANIMACIÓN DE CARDS AL ENTRAR ────────────────────────────── */
+@keyframes cardSlideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.row-cards .col-sm-6,
+.row-cards .col-lg-3,
+.row-cards .col-lg-4 {
+    animation: cardSlideUp 0.4s ease both;
+}
+
+.row-cards .col-sm-6:nth-child(1) { animation-delay: 0.05s; }
+.row-cards .col-sm-6:nth-child(2) { animation-delay: 0.10s; }
+.row-cards .col-sm-6:nth-child(3) { animation-delay: 0.15s; }
+.row-cards .col-sm-6:nth-child(4) { animation-delay: 0.20s; }
+.row-cards .col-lg-4:nth-child(1) { animation-delay: 0.05s; }
+.row-cards .col-lg-4:nth-child(2) { animation-delay: 0.10s; }
+.row-cards .col-lg-4:nth-child(3) { animation-delay: 0.15s; }
+
+/* ── RIBBON ESPECIAL ─────────────────────────────────────────── */
+.ribbon {
+    --tblr-ribbon-margin: 0.5rem;
+}
+
+/* ── HERO PAGE HEADER ────────────────────────────────────────── */
+.page-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f8fafc 100%) !important;
+}
+
+/* ── BOTONES PREMIUM ─────────────────────────────────────────── */
+.btn {
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+/* ── TABLA MEJORADA ──────────────────────────────────────────── */
+.table > thead > tr > th {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #64748b;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f0f4ff;
+    transition: background-color 0.15s;
+}
+
+/* ── FORMULARIOS PREMIUM ─────────────────────────────────────── */
+.form-control:focus,
+.form-select:focus {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* ── MODAL BLUR PREMIUM ──────────────────────────────────────── */
+.modal-blur .modal-content {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.8);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2);
+}
+
+/* ── SCROLLBAR CUSTOM ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── TEXT TRUNCATE 2 LÍNEAS ──────────────────────────────────── */
+.text-truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ── BADGE DE ESTADO ANIMADO ─────────────────────────────────── */
+.badge-pulse {
+    animation: badgePulse 3s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.6; }
+}
+
+/* ── SUB-TABS OVERFLOW SCROLL ────────────────────────────────── */
+#adminTabs::-webkit-scrollbar { height: 0; }
+
+/* ── RESTAURANT DELIVERY / PICKUP SWITCHER ──────────────────── */
+.mode-switcher-container {
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 50px;
+    display: inline-flex;
+    border: 1px solid #e2e8f0;
+}
+
+.mode-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 18px;
+    border-radius: 50px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #64748b;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mode-btn.active {
+    background: #ffffff;
+    color: #e11d48;
+    box-shadow: 0 2px 6px rgba(225, 29, 72, 0.15);
+}
+
+.mode-btn:hover:not(.active) {
+    color: #1e293b;
+}
+
+/* ── BADGES GASTRONÓMICOS & TIEMPO PREP ──────────────────────── */
+.badge-prep {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
+    color: #334155;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.badge-dietary {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-chef {
+    background: #fef2f2;
+    color: #e11d48;
+    border: 1px solid #fecdd3;
+}
+
+.badge-vegan {
+    background: #f0fdf4;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+}
+
+/* ── TRACKER DE PEDIDO EN VIVO (CLIENTE & KDS) ─────────────────── */
+.order-steps-track {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+    margin: 20px 0;
+}
+
+.order-steps-track::before {
+    content: '';
+    position: absolute;
+    top: 18px;
+    left: 20px;
+    right: 20px;
+    height: 3px;
+    background: #e2e8f0;
+    z-index: 1;
+}
+
+.step-item {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    flex: 1;
+}
+
+.step-bubble {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 3px solid #cbd5e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 6px;
+    font-size: 1.1rem;
+    color: #94a3b8;
+    transition: all 0.3s ease;
+}
+
+.step-item.active .step-bubble {
+    border-color: #e11d48;
+    background: #e11d48;
+    color: #ffffff;
+    box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.2);
+}
+
+.step-item.completed .step-bubble {
+    border-color: #059669;
+    background: #059669;
+    color: #ffffff;
+}
+
+.step-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.step-item.active .step-label {
+    color: #e11d48;
+}
+
+.step-item.completed .step-label {
+    color: #059669;
+}
+
+/* ── TARJETA KDS COCINA ──────────────────────────────────────── */
+.kds-card {
+    border-left: 4px solid #cbd5e1;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.kds-card.status-recibido { border-left-color: #3b82f6; }
+.kds-card.status-en_preparacion { border-left-color: #f59e0b; }
+.kds-card.status-listo { border-left-color: #8b5cf6; }
+.kds-card.status-en_camino { border-left-color: #06b6d4; }
+.kds-card.status-entregado { border-left-color: #10b981; }
+
+.kds-dish-line {
+    padding: 6px 0;
+    border-bottom: 1px dashed #e2e8f0;
+}
+.kds-dish-line:last-child {
+    border-bottom: none;
+}
+

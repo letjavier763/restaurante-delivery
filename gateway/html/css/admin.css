@@ -1,0 +1,280 @@
+/* ==============================================================================
+   TECHNOVA ADMIN & AUDIT PANEL - DASHBOARD STYLES
+   Panel de Auditoría Forense, Métricas Chart.js y Gestión de Operaciones
+   ============================================================================== */
+
+.admin-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* SIDEBAR */
+.admin-sidebar {
+    width: 260px;
+    background: #0a0f1d;
+    border-right: 1px solid var(--border-color);
+    padding: 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 0.5rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 1.5rem;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 1;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.nav-item:hover, .nav-item.active {
+    background: rgba(99, 102, 241, 0.15);
+    color: #ffffff;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.nav-item.active {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.2));
+    border-color: var(--accent-cyan);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.15);
+}
+
+.sidebar-footer {
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* MAIN CONTENT */
+.admin-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #090d16;
+    overflow-y: auto;
+}
+
+.admin-topbar {
+    padding: 1rem 2rem;
+    background: var(--bg-glass);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.admin-content {
+    padding: 2rem;
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+/* KPI CARDS */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    backdrop-filter: blur(12px);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--primary);
+}
+
+.kpi-card.kpi-cyan::before { background: var(--accent-cyan); }
+.kpi-card.kpi-emerald::before { background: var(--accent-emerald); }
+.kpi-card.kpi-rose::before { background: var(--accent-rose); }
+
+.kpi-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    color: #ffffff;
+}
+
+.kpi-badge {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--accent-emerald);
+}
+
+/* CHARTS ROW */
+.charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.chart-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    height: 340px;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-card h4 {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+/* DATA TABLES */
+.table-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-top: 1.5rem;
+}
+
+.table-header-box {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.custom-table th {
+    background: rgba(15, 23, 42, 0.9);
+    padding: 0.85rem 1.2rem;
+    text-align: left;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.custom-table td {
+    padding: 0.85rem 1.2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+}
+
+.custom-table tr:hover td {
+    background: rgba(99, 102, 241, 0.04);
+}
+
+/* AUDIT RESULT BADGES */
+.badge-exito {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #34d399;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.badge-fallo {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    color: #fbbf24;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.badge-fraude {
+    background: rgba(244, 63, 94, 0.15);
+    border: 1px solid rgba(244, 63, 94, 0.4);
+    color: #fb7185;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    animation: alertBlink 1.5s infinite;
+}
+
+@keyframes alertBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* CODE / JSON BLOCK */
+.json-view {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    background: #070b14;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem;
+    max-height: 120px;
+    overflow-y: auto;
+    color: #a5b4fc;
+    white-space: pre-wrap;
+}
+
+/* TABS CONTAINER */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}

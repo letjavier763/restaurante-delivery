@@ -1,0 +1,1082 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+    <title>Panel de Administración & Cocina KDS | Bistró Gourmet</title>
+    <meta name="description" content="Consola administrativa y KDS de cocina en fondo claro con Tabler UI — Gestión de menú gourmet, delivery/pickup, auditoría forense y verificación PCI-DSS."/>
+
+    <!-- Tabler Core CSS & Tabler Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler-vendors.min.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+
+    <!-- Custom Light Tabler Overrides -->
+    <link rel="stylesheet" href="css/tabler-custom.css"/>
+
+    <!-- Chart.js para Métricas Forenses y Ventas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body data-bs-theme="light">
+    <div class="page">
+        <!-- ==================================================================
+             HEADER SUPERIOR DE ADMINISTRACIÓN TABLER
+             ================================================================== -->
+        <header class="navbar navbar-expand-md navbar-light bg-white d-print-none border-bottom sticky-top">
+            <div class="container-xl">
+                <!-- Marca / Logo Admin -->
+                <a href="/admin.html" class="navbar-brand d-none-navbar-horizontal pe-0 pe-md-3">
+                    <span class="avatar avatar-sm bg-primary text-white me-2 rounded shadow-sm">
+                        <i class="ti ti-tools-kitchen-2 fs-2"></i>
+                    </span>
+                    <span class="fs-2 fw-bold text-dark" style="font-family: 'Playfair Display', serif;">Bistró Gourmet</span>
+                    <span class="badge bg-red-lt ms-2">Admin &amp; KDS</span>
+                </a>
+
+                <div class="navbar-nav flex-row order-md-last align-items-center gap-2">
+                    <!-- Widget Clima/Estado -->
+                    <div class="badge bg-light text-dark border d-none d-lg-inline-flex align-items-center p-2">
+                        <i class="ti ti-sun me-1 text-warning fs-3"></i>
+                        <span>Guatemala: <strong>21°C • Cocina Activa</strong></span>
+                    </div>
+
+                    <!-- Ir a Tienda Pública -->
+                    <a href="/index.html" class="btn btn-outline-primary btn-sm">
+                        <i class="ti ti-tools-kitchen me-1"></i> Ver Menú
+                    </a>
+
+                    <!-- Perfil Admin -->
+                    <div class="nav-item dropdown">
+                        <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown">
+                            <span class="avatar avatar-sm bg-primary-lt">
+                                <i class="ti ti-chef-hat text-primary"></i>
+                            </span>
+                            <div class="d-none d-xl-block ps-2">
+                                <div id="adminUserEmail" class="fw-bold text-dark small">admin@bistrogourmet.com</div>
+                                <div class="text-muted" style="font-size: 0.65rem;">Gerente General &amp; Chef</div>
+                            </div>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <a href="/index.html" class="dropdown-item"><i class="ti ti-home me-2"></i>Ir al Menú Público</a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item text-danger" onclick="if(confirm('¿Cerrar sesión?')){API.logout(); window.location.href='/index.html';}">
+                                <i class="ti ti-logout me-2"></i>Cerrar Sesión
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- SUB-NAVBAR DE PESTAÑAS TABLER -->
+        <header class="navbar-expand-md border-bottom bg-white">
+            <div class="collapse navbar-collapse" id="navbar-sub">
+                <div class="navbar navbar-light">
+                    <div class="container-xl">
+                        <ul class="nav nav-tabs card-header-tabs border-0 flex-nowrap overflow-auto" id="adminTabs" style="scrollbar-width: none;">
+                            <li class="nav-item">
+                                <a href="#tab-overview" class="nav-link active" onclick="Admin.switchTab('tab-overview')">
+                                    <i class="ti ti-layout-dashboard me-2 text-primary"></i> Resumen &amp; KPIs
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="#tab-products" class="nav-link" onclick="Admin.switchTab('tab-products')">
+                                    <i class="ti ti-tools-kitchen-2 me-2 text-red"></i> Platillos &amp; Menú
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="#tab-catalog" class="nav-link" onclick="Admin.switchTab('tab-catalog')">
+                                    <i class="ti ti-currency-dollar me-2 text-cyan"></i> Precios &amp; Porciones
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="#tab-orders" class="nav-link" onclick="Admin.switchTab('tab-orders')">
+                                    <i class="ti ti-flame me-2 text-warning"></i> Cocina KDS &amp; Pedidos
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="#tab-users" class="nav-link" onclick="Admin.switchTab('tab-users')">
+                                    <i class="ti ti-users me-2 text-azure"></i> Usuarios
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="#tab-audit" class="nav-link" onclick="Admin.switchTab('tab-audit')">
+                                    <i class="ti ti-file-certificate me-2 text-yellow"></i> Auditoría (SEC-2)
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="#tab-pci" class="nav-link" onclick="Admin.switchTab('tab-pci')">
+                                    <i class="ti ti-credit-card me-2 text-teal"></i> PCI-DSS (SEC-3)
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="#tab-hardening" class="nav-link" onclick="Admin.switchTab('tab-hardening')">
+                                    <i class="ti ti-server-2 me-2 text-indigo"></i> Hardening (SEC-5)
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <div class="page-wrapper">
+            <div class="page-body">
+                <div class="container-xl">
+
+                    <!-- ======================================================
+                         PESTAÑA 1: RESUMEN Y KPIS CON CHART.JS
+                         ====================================================== -->
+                    <div id="tab-overview" class="tab-pane-content active">
+                        <!-- KPIs DINÁMICOS -->
+                        <div class="row row-deck row-cards mb-4">
+                            <div class="col-sm-6 col-lg-3">
+                                <div class="card card-tech">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <div class="subheader text-secondary">Volumen Total Ventas</div>
+                                            <div class="ms-auto badge bg-green-lt">Conciliado</div>
+                                        </div>
+                                        <div class="h1 mb-1 font-monospace text-dark" id="kpiVolumenVentas">
+                                            <div class="spinner-border spinner-border-sm text-muted"></div>
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            <span class="avatar avatar-xs bg-green-lt rounded me-2"><i class="ti ti-currency-dollar"></i></span>
+                                            <span class="text-secondary small">Stripe Sandbox Payments</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-lg-3">
+                                <div class="card card-tech">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <div class="subheader text-secondary">Logs de Auditoría</div>
+                                            <div class="ms-auto badge bg-cyan-lt" id="kpiTotalLogsBadge">—</div>
+                                        </div>
+                                        <div class="h1 mb-1 font-monospace text-primary" id="kpiTotalLogs">—</div>
+                                        <div class="d-flex align-items-center">
+                                            <span class="avatar avatar-xs bg-cyan-lt rounded me-2"><i class="ti ti-file-text"></i></span>
+                                            <span class="text-secondary small">14 Acciones Auditables</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-lg-3">
+                                <div class="card card-tech">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <div class="subheader text-secondary">Productos en Catálogo</div>
+                                            <div class="ms-auto badge bg-indigo-lt" id="kpiProductosAgotados">0 Agotados</div>
+                                        </div>
+                                        <div class="h1 mb-1 font-monospace text-indigo" id="kpiTotalProductos">—</div>
+                                        <div class="d-flex align-items-center">
+                                            <span class="avatar avatar-xs bg-indigo-lt rounded me-2"><i class="ti ti-tools-kitchen-2"></i></span>
+                                            <span class="text-secondary small">Platillos &amp; Bebidas Gourmet</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-lg-3">
+                                <div class="card card-tech">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <div class="subheader text-secondary">Pedidos Totales</div>
+                                            <div class="ms-auto badge bg-warning-lt" id="kpiPedidosPendientes">— Pend.</div>
+                                        </div>
+                                        <div class="h1 mb-1 font-monospace text-warning" id="kpiTotalPedidos">—</div>
+                                        <div class="d-flex align-items-center">
+                                            <span class="avatar avatar-xs bg-warning-lt rounded me-2"><i class="ti ti-package"></i></span>
+                                            <span class="text-secondary small">Ciclo completo de compra</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- GRÁFICAS CHART.JS -->
+                        <div class="row row-cards mb-4">
+                            <div class="col-lg-4">
+                                <div class="card card-tech h-100">
+                                    <div class="card-header bg-white">
+                                        <h3 class="card-title text-dark">
+                                            <i class="ti ti-shield-check me-2 text-cyan"></i> Auditoría: Éxito vs Alertas
+                                        </h3>
+                                    </div>
+                                    <div class="card-body" style="height: 300px; position: relative;">
+                                        <canvas id="chartSeguridad"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <div class="card card-tech h-100">
+                                    <div class="card-header bg-white">
+                                        <h3 class="card-title text-dark">
+                                            <i class="ti ti-activity me-2 text-primary"></i> Top Eventos de Compra
+                                        </h3>
+                                    </div>
+                                    <div class="card-body" style="height: 300px; position: relative;">
+                                        <canvas id="chartEventos"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <div class="card card-tech h-100">
+                                    <div class="card-header bg-white">
+                                        <h3 class="card-title text-dark">
+                                            <i class="ti ti-truck-delivery me-2 text-green"></i> Pedidos por Estado
+                                        </h3>
+                                    </div>
+                                    <div class="card-body" style="height: 300px; position: relative;">
+                                        <canvas id="chartPedidosEstado"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Estado del Clúster -->
+                        <div class="row row-cards">
+                            <div class="col-12">
+                                <div class="card card-tech">
+                                    <div class="card-header bg-white">
+                                        <h3 class="card-title text-dark">
+                                            <i class="ti ti-server me-2 text-indigo"></i> Estado del Clúster Distribuido
+                                        </h3>
+                                        <div class="card-options">
+                                            <span class="badge bg-green-lt d-inline-flex align-items-center gap-1">
+                                                <span class="status-dot-pulse"></span> ONLINE
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-3">
+                                            <div class="col-6 col-md-3">
+                                                <div class="card bg-light border-0">
+                                                    <div class="card-body py-2 px-3">
+                                                        <div class="text-muted small">MariaDB Master</div>
+                                                        <div class="fw-bold text-green d-flex align-items-center gap-1"><i class="ti ti-circle-check"></i> ESCRITURA</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-6 col-md-3">
+                                                <div class="card bg-light border-0">
+                                                    <div class="card-body py-2 px-3">
+                                                        <div class="text-muted small">MariaDB Slave</div>
+                                                        <div class="fw-bold text-green d-flex align-items-center gap-1"><i class="ti ti-circle-check"></i> LECTURA</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-6 col-md-3">
+                                                <div class="card bg-light border-0">
+                                                    <div class="card-body py-2 px-3">
+                                                        <div class="text-muted small">Redis Cache</div>
+                                                        <div class="fw-bold text-green d-flex align-items-center gap-1"><i class="ti ti-circle-check"></i> ACTIVO</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-6 col-md-3">
+                                                <div class="card bg-light border-0">
+                                                    <div class="card-body py-2 px-3">
+                                                        <div class="text-muted small">Audit DB (Aislada)</div>
+                                                        <div class="fw-bold text-green d-flex align-items-center gap-1"><i class="ti ti-circle-check"></i> APPEND-ONLY</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ======================================================
+                         PESTAÑA 2: CRUD DE PRODUCTOS
+                         ====================================================== -->
+                    <div id="tab-products" class="tab-pane-content" style="display: none;">
+                        <div class="card card-tech">
+                            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <h3 class="card-title text-dark">
+                                        <i class="ti ti-packages me-2 text-indigo"></i> Catálogo CRUD — Gestión de Productos
+                                    </h3>
+                                    <p class="card-subtitle mb-0">Agregar, editar y eliminar productos del catálogo electrónico.</p>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-indigo-lt" id="productsCrudCount">—</span>
+                                    <button class="btn btn-primary" onclick="Admin.openAddProductModal()">
+                                        <i class="ti ti-plus me-1"></i> Nuevo Producto
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row row-cards" id="productsCrudGrid">
+                                    <div class="col-12 text-center py-5">
+                                        <div class="spinner-border text-primary"></div>
+                                        <div class="text-muted mt-2">Cargando catálogo...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ======================================================
+                         PESTAÑA 3: GESTIÓN DE PRECIOS Y STOCK
+                         ====================================================== -->
+                    <div id="tab-catalog" class="tab-pane-content" style="display: none;">
+                        <div class="card card-tech">
+                            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <h3 class="card-title text-dark">
+                                        <i class="ti ti-currency-dollar me-2 text-cyan"></i> Precios Oficiales &amp; Control de Inventario
+                                    </h3>
+                                    <p class="card-subtitle mb-0">Cada modificación de precio registra el evento inmutable <code>PRECIO_MODIFICADO</code> en auditoría.</p>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-vcenter card-table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Producto / SKU</th>
+                                            <th>Categoría</th>
+                                            <th>Precio Servidor</th>
+                                            <th>Stock</th>
+                                            <th class="text-end">Acciones Auditables</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="catalogAdminTable">
+                                        <tr><td colspan="6" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ======================================================
+                         PESTAÑA 4: GESTIÓN DE PEDIDOS
+                         ====================================================== -->
+                    <div id="tab-orders" class="tab-pane-content" style="display: none;">
+                        <div class="card card-tech">
+                            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <h3 class="card-title text-dark">
+                                        <i class="ti ti-flame me-2 text-warning"></i> Monitor de Cocina KDS &amp; Pedidos (Delivery &amp; Pickup)
+                                    </h3>
+                                    <p class="card-subtitle mb-0">Control de órdenes en tiempo real, separación por modalidad y registro auditable de <code>PEDIDO_ESTADO_CAMBIADO</code>.</p>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-primary" id="btnViewKdsKanban" onclick="Admin.setOrdersView('kanban')">
+                                            <i class="ti ti-layout-kanban me-1"></i> Tablero KDS
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary" id="btnViewOrdersTable" onclick="Admin.setOrdersView('table')">
+                                            <i class="ti ti-table me-1"></i> Tabla Detallada
+                                        </button>
+                                    </div>
+                                    <div class="btn-list">
+                                        <button class="btn btn-outline-secondary btn-sm" onclick="Admin.exportOrdersData('csv')">
+                                            <i class="ti ti-file-spreadsheet me-1 text-green"></i> CSV
+                                        </button>
+                                        <button class="btn btn-outline-secondary btn-sm" onclick="Admin.exportOrdersData('json')">
+                                            <i class="ti ti-braces me-1 text-cyan"></i> JSON
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- CONTENEDOR 1: TABLERO KDS DE COCINA (KANBAN) -->
+                            <div class="card-body p-3 bg-light" id="kdsKanbanContainer">
+                                <div class="row g-3">
+                                    <!-- Columna 1: Recibidos -->
+                                    <div class="col-md-6 col-xl-3">
+                                        <div class="card border-0 shadow-sm bg-white h-100">
+                                            <div class="card-header bg-white py-2 border-bottom d-flex justify-content-between align-items-center">
+                                                <span class="fw-bold text-dark d-flex align-items-center">
+                                                    <i class="ti ti-clipboard-list text-primary me-2 fs-3"></i> Recibidos
+                                                </span>
+                                                <span class="badge bg-primary-lt" id="kdsCountRecibido">0</span>
+                                            </div>
+                                            <div class="card-body p-2 d-flex flex-column gap-2" id="kdsColRecibido" style="min-height: 380px; max-height: 600px; overflow-y: auto;">
+                                                <div class="text-center text-muted py-4 small">Sin órdenes pendientes</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Columna 2: En Cocina -->
+                                    <div class="col-md-6 col-xl-3">
+                                        <div class="card border-0 shadow-sm bg-white h-100">
+                                            <div class="card-header bg-white py-2 border-bottom d-flex justify-content-between align-items-center">
+                                                <span class="fw-bold text-dark d-flex align-items-center">
+                                                    <i class="ti ti-flame text-warning me-2 fs-3"></i> En Preparación
+                                                </span>
+                                                <span class="badge bg-warning-lt" id="kdsCountCocina">0</span>
+                                            </div>
+                                            <div class="card-body p-2 d-flex flex-column gap-2" id="kdsColCocina" style="min-height: 380px; max-height: 600px; overflow-y: auto;">
+                                                <div class="text-center text-muted py-4 small">Cocina al día</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Columna 3: Listo / Empaque -->
+                                    <div class="col-md-6 col-xl-3">
+                                        <div class="card border-0 shadow-sm bg-white h-100">
+                                            <div class="card-header bg-white py-2 border-bottom d-flex justify-content-between align-items-center">
+                                                <span class="fw-bold text-dark d-flex align-items-center">
+                                                    <i class="ti ti-package text-purple me-2 fs-3"></i> Listos / Empaque
+                                                </span>
+                                                <span class="badge bg-purple-lt" id="kdsCountListo">0</span>
+                                            </div>
+                                            <div class="card-body p-2 d-flex flex-column gap-2" id="kdsColListo" style="min-height: 380px; max-height: 600px; overflow-y: auto;">
+                                                <div class="text-center text-muted py-4 small">Sin platillos en espera</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Columna 4: En Camino / Despachados -->
+                                    <div class="col-md-6 col-xl-3">
+                                        <div class="card border-0 shadow-sm bg-white h-100">
+                                            <div class="card-header bg-white py-2 border-bottom d-flex justify-content-between align-items-center">
+                                                <span class="fw-bold text-dark d-flex align-items-center">
+                                                    <i class="ti ti-moped text-cyan me-2 fs-3"></i> En Ruta / Reparto
+                                                </span>
+                                                <span class="badge bg-cyan-lt" id="kdsCountCamino">0</span>
+                                            </div>
+                                            <div class="card-body p-2 d-flex flex-column gap-2" id="kdsColCamino" style="min-height: 380px; max-height: 600px; overflow-y: auto;">
+                                                <div class="text-center text-muted py-4 small">Sin despachos en curso</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- CONTENEDOR 2: TABLA DETALLADA DE PEDIDOS (INICIALMENTE OCULTA O ALTERNABLE) -->
+                            <div class="table-responsive" id="ordersTableContainer" style="display: none;">
+                                <table class="table table-vcenter card-table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>No. Pedido / Modalidad</th>
+                                            <th>Cliente &amp; Destino</th>
+                                            <th>Platillos &amp; Total</th>
+                                            <th>Estado Cocina (KDS)</th>
+                                            <th>Fecha</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ordersAdminTable">
+                                        <tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ======================================================
+                         PESTAÑA 5: GESTIÓN DE USUARIOS
+                         ====================================================== -->
+                    <div id="tab-users" class="tab-pane-content" style="display: none;">
+                        <div class="card card-tech">
+                            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <h3 class="card-title text-dark">
+                                        <i class="ti ti-users me-2 text-azure"></i> Gestión de Usuarios Registrados
+                                    </h3>
+                                    <p class="card-subtitle mb-0">Activar/desactivar cuentas y asignar roles. Cada cambio se registra en auditoría.</p>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-azure-lt" id="usersCount">—</span>
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="Admin.exportUsersData('csv')">
+                                        <i class="ti ti-file-spreadsheet me-1 text-green"></i> CSV
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="Admin.exportUsersData('json')">
+                                        <i class="ti ti-braces me-1 text-cyan"></i> JSON
+                                    </button>
+                                    <div class="input-icon" style="width: 220px;">
+                                        <span class="input-icon-addon"><i class="ti ti-search text-muted"></i></span>
+                                        <input type="text" id="usersSearch" class="form-control form-control-sm" placeholder="Buscar usuario..." oninput="Admin.filterUsers()"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-vcenter card-table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Usuario</th>
+                                            <th>Rol</th>
+                                            <th>Estado</th>
+                                            <th>Último Acceso</th>
+                                            <th class="text-end">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="usersAdminTable">
+                                        <tr><td colspan="6" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ======================================================
+                         PESTAÑA 6: AUDITORÍA FORENSE INMUTABLE (SEC-2)
+                         ====================================================== -->
+                    <div id="tab-audit" class="tab-pane-content" style="display: none;">
+                        <div class="card card-tech">
+                            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <h3 class="card-title text-dark">
+                                        <i class="ti ti-file-certificate me-2 text-yellow"></i> Registro Central de Seguridad — <code>security_audit_logs</code>
+                                    </h3>
+                                    <p class="card-subtitle mb-0">Base de datos dedicada con permisos estrictamente <strong>APPEND-ONLY</strong> (sin UPDATE ni DELETE permitidos).</p>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-green-lt fs-3" id="totalAuditLogsCount">Cargando...</span>
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="Admin.exportAuditData('csv')">
+                                        <i class="ti ti-file-spreadsheet me-1"></i> CSV
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="Admin.exportAuditData('json')">
+                                        <i class="ti ti-braces me-1"></i> JSON
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Filtros -->
+                            <div class="card-body border-bottom py-3 bg-light">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-md-4">
+                                        <select id="filterAccion" class="form-select form-select-sm bg-white" onchange="Admin.loadAuditLogs()">
+                                            <option value="">-- Todos los Eventos --</option>
+                                            <option value="LOGIN_CLIENTE_EXITOSO">LOGIN_CLIENTE_EXITOSO</option>
+                                            <option value="LOGIN_CLIENTE_FALLIDO">LOGIN_CLIENTE_FALLIDO</option>
+                                            <option value="REGISTRO_CLIENTE">REGISTRO_CLIENTE</option>
+                                            <option value="PEDIDO_CREADO">PEDIDO_CREADO</option>
+                                            <option value="PAGO_INICIADO">PAGO_INICIADO</option>
+                                            <option value="PAGO_CONFIRMADO">PAGO_CONFIRMADO</option>
+                                            <option value="PAGO_FALLIDO">PAGO_FALLIDO</option>
+                                            <option value="PEDIDO_ESTADO_CAMBIADO">PEDIDO_ESTADO_CAMBIADO</option>
+                                            <option value="PRECIO_MODIFICADO">PRECIO_MODIFICADO</option>
+                                            <option value="PRODUCTO_AGOTADO">PRODUCTO_AGOTADO</option>
+                                            <option value="EXPORTACION_CLIENTES">EXPORTACION_CLIENTES</option>
+                                            <option value="ACCESO_ADMIN_PANEL">ACCESO_ADMIN_PANEL</option>
+                                            <option value="WEBHOOK_STRIPE_RECIBIDO">WEBHOOK_STRIPE_RECIBIDO</option>
+                                            <option value="TOKEN_REVOCADO">TOKEN_REVOCADO</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select id="filterResultado" class="form-select form-select-sm bg-white" onchange="Admin.loadAuditLogs()">
+                                            <option value="">-- Todos los Resultados --</option>
+                                            <option value="EXITO">EXITO</option>
+                                            <option value="FALLO">FALLO</option>
+                                            <option value="FRAUDE">FRAUDE</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select id="filterServicio" class="form-select form-select-sm bg-white" onchange="Admin.loadAuditLogs()">
+                                            <option value="">-- Todos los Servicios --</option>
+                                            <option value="auth-service">auth-service</option>
+                                            <option value="catalogo-service">catalogo-service</option>
+                                            <option value="pedidos-service">pedidos-service</option>
+                                            <option value="pagos-service">pagos-service</option>
+                                            <option value="security-audit-service">security-audit-service</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 text-end">
+                                        <button class="btn btn-outline-secondary btn-sm w-100" onclick="Admin.loadAuditLogs()">
+                                            <i class="ti ti-refresh me-1"></i> Actualizar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-vcenter card-table table-hover table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>Acción</th>
+                                            <th>Servicio</th>
+                                            <th>Actor</th>
+                                            <th>Resultado</th>
+                                            <th>IP Origen</th>
+                                            <th class="text-end">Payload</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="auditLogsTable">
+                                        <tr><td colspan="7" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ======================================================
+                         PESTAÑA 7: VERIFICACIÓN PCI-DSS (SEC-3)
+                         ====================================================== -->
+                    <div id="tab-pci" class="tab-pane-content" style="display: none;">
+                        <div class="card card-tech">
+                            <div class="card-status-top bg-teal"></div>
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-4">
+                                    <div class="avatar avatar-md bg-teal-lt rounded me-3">
+                                        <i class="ti ti-shield-lock fs-1 text-teal"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="card-title h2 text-dark mb-0">Verificación de Cumplimiento PCI-DSS v4.0</h3>
+                                        <span class="text-secondary small">Entregable obligatorio [SEC-3] — Comprobación de que la base de datos no contiene datos de tarjeta (PAN/CVV)</span>
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-info mb-4">
+                                    <div class="d-flex">
+                                        <i class="ti ti-info-circle fs-2 me-3 text-blue"></i>
+                                        <div>
+                                            <h4 class="alert-title">¿Qué verifica esta auditoría?</h4>
+                                            <p class="mb-0 small">El estándar <strong>PCI-DSS</strong> penaliza con pérdida de hasta 4 puntos el almacenamiento de números de tarjeta (PAN), CVV o fecha de expiración. En <strong>Bistró Gourmet</strong>, la tabla <code>pagos</code> en <code>pagos_db</code> contiene exclusivamente el <code>payment_intent_id</code> de Stripe — nunca datos bancarios reales.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button class="btn btn-primary btn-lg" id="btnRunPciCheck" onclick="Admin.runPciCheck()">
+                                    <i class="ti ti-database-search me-2"></i> Ejecutar Auditoría de Esquema en MariaDB
+                                </button>
+
+                                <div id="pciCheckResult" class="mt-4" style="display: none;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ======================================================
+                         PESTAÑA 8: DOCKER HARDENING (SEC-5)
+                         ====================================================== -->
+                    <div id="tab-hardening" class="tab-pane-content" style="display: none;">
+                        <div class="card card-tech">
+                            <div class="card-status-top bg-indigo"></div>
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-4">
+                                    <div class="avatar avatar-md bg-indigo-lt rounded me-3">
+                                        <i class="ti ti-server-cog fs-1 text-indigo"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="card-title h2 text-dark mb-0">Verificación de Docker Hardening (SEC-5)</h3>
+                                        <span class="text-secondary small">Aislamiento de red interna y protección de puertos de bases de datos</span>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="card bg-light border-0">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <span class="avatar avatar-sm bg-green-lt me-2"><i class="ti ti-lock"></i></span>
+                                                    <h4 class="card-title text-dark mb-0">1. Puertos No Expuestos</h4>
+                                                </div>
+                                                <p class="small text-secondary mb-0">
+                                                    <code>mariadb-master</code>, <code>mariadb-slave</code>, <code>mariadb-audit</code> y <code>redis</code> no tienen directivas <code>ports:</code> en <code>docker-compose.yml</code>. No responden a escaneos externos en <code>0.0.0.0:3306</code> ni <code>0.0.0.0:6379</code>.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-light border-0">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <span class="avatar avatar-sm bg-cyan-lt me-2"><i class="ti ti-user-x"></i></span>
+                                                    <h4 class="card-title text-dark mb-0">2. Usuario No-Root</h4>
+                                                </div>
+                                                <p class="small text-secondary mb-0">
+                                                    Todos los microservicios PHP se ejecutan bajo la cuenta sin privilegios <code>USER www-data</code> en sus respectivos Dockerfiles. El usuario de MariaDB <code>app_user</code> tiene permisos mínimos necesarios.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-light border-0">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <span class="avatar avatar-sm bg-yellow-lt me-2"><i class="ti ti-database"></i></span>
+                                                    <h4 class="card-title text-dark mb-0">3. Volúmenes Separados</h4>
+                                                </div>
+                                                <p class="small text-secondary mb-0">
+                                                    La base de datos de auditoría se encuentra en el volumen independiente <code>technova_audit_db_data</code>, aislado de las bases de negocio (<code>technova_master_db_data</code> / <code>slave_db_data</code>).
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-light border-0">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <span class="avatar avatar-sm bg-primary-lt me-2"><i class="ti ti-cpu"></i></span>
+                                                    <h4 class="card-title text-dark mb-0">4. Resource Limits</h4>
+                                                </div>
+                                                <p class="small text-secondary mb-0">
+                                                    Cada contenedor tiene directivas <code>cpus</code> y <code>memory</code> configuradas para prevenir saturación por ataques DoS/DDoS.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-light border-0">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <span class="avatar avatar-sm bg-red-lt me-2"><i class="ti ti-network"></i></span>
+                                                    <h4 class="card-title text-dark mb-0">5. Red Interna Privada</h4>
+                                                </div>
+                                                <p class="small text-secondary mb-0">
+                                                    Red <code>technova_network</code> (tipo bridge interno). Los microservicios se comunican por nombre de contenedor. Solo el Gateway Nginx expone los puertos 80/443.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-light border-0">
+                                            <div class="card-body">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <span class="avatar avatar-sm bg-teal-lt me-2"><i class="ti ti-shield-check"></i></span>
+                                                    <h4 class="card-title text-dark mb-0">6. Healthchecks Automáticos</h4>
+                                                </div>
+                                                <p class="small text-secondary mb-0">
+                                                    Cada servicio tiene un <code>healthcheck</code> en Docker Compose para garantizar disponibilidad y reiniciar automáticamente en caso de fallo.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         MODALES ADMINISTRATIVOS
+         ====================================================================== -->
+
+    <!-- MODAL: EDITAR PRECIO -->
+    <div class="modal modal-blur fade" id="editPriceModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="ti ti-currency-dollar me-1 text-cyan"></i> Actualizar Precio — Evento Auditable</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editPriceForm" onsubmit="Admin.submitEditPrice(event)">
+                    <div class="modal-body">
+                        <input type="hidden" id="editProdId"/>
+                        <div class="mb-3">
+                            <span class="text-secondary small">Producto:</span>
+                            <h4 id="editProdNombre" class="text-dark mt-1 mb-0">-</h4>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required" for="editProdPrecio">Nuevo Precio (USD)</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="ti ti-currency-dollar"></i></span>
+                                <input type="number" step="0.01" min="0.01" id="editProdPrecio" class="form-control" required/>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required" for="editProdMotivo">Justificación de Auditoría</label>
+                            <input type="text" id="editProdMotivo" class="form-control" required value="Ajuste promocional de catálogo"/>
+                        </div>
+                        <div class="alert alert-info py-2 small mb-0">
+                            <i class="ti ti-info-circle me-1"></i> Este cambio generará el evento inmutable <code>PRECIO_MODIFICADO</code>.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ti ti-check me-1"></i> Guardar y Auditar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDITAR STOCK -->
+    <div class="modal modal-blur fade" id="editStockModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="ti ti-package me-1 text-cyan"></i> Actualizar Stock de Inventario</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form onsubmit="Admin.submitEditStock(event)">
+                    <div class="modal-body">
+                        <input type="hidden" id="editStockProdId"/>
+                        <div class="mb-3">
+                            <span class="text-secondary small">Producto:</span>
+                            <h4 id="editStockProdNombre" class="text-dark mt-1 mb-0">-</h4>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required" for="editStockCantidad">Nuevo Stock (Unidades)</label>
+                            <input type="number" min="0" id="editStockCantidad" class="form-control" required/>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="editStockMotivo">Motivo del Ajuste</label>
+                            <input type="text" id="editStockMotivo" class="form-control" value="Reabastecimiento de inventario"/>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ti ti-check me-1"></i> Actualizar Stock
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: AGREGAR PRODUCTO -->
+    <div class="modal modal-blur fade" id="addProductModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="ti ti-plus me-1 text-primary"></i> Agregar Nuevo Producto al Catálogo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="addProductForm">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label required" for="addProdNombre">Nombre del Producto</label>
+                                <input type="text" id="addProdNombre" class="form-control" required placeholder="Ej: ASUS ROG Strix B550-F Gaming"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required" for="addProdSku">SKU</label>
+                                <input type="text" id="addProdSku" class="form-control" required placeholder="TN-ASUS-001"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required" for="addProdPrecio">Precio (USD)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" min="0.01" id="addProdPrecio" class="form-control" required placeholder="0.00"/>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required" for="addProdStock">Stock Inicial</label>
+                                <input type="number" min="0" id="addProdStock" class="form-control" required placeholder="0"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required" for="addProdCategoria">Categoría</label>
+                                <select id="addProdCategoria" class="form-select" required>
+                                    <option value="">Cargando...</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="addProdDescripcion">Descripción</label>
+                                <textarea id="addProdDescripcion" class="form-control" rows="2" placeholder="Descripción técnica del producto..."></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="addProdImagen">URL de Imagen</label>
+                                <input type="url" id="addProdImagen" class="form-control" placeholder="https://images.unsplash.com/..."/>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="addProdDestacado"/>
+                                    <span class="form-check-label">Producto Destacado <i class="ti ti-star text-yellow ms-1"></i></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ti ti-plus me-1"></i> Agregar Producto
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDITAR PRODUCTO -->
+    <div class="modal modal-blur fade" id="editProductModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="ti ti-edit me-1 text-indigo"></i> Editar Producto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editProductForm">
+                    <div class="modal-body">
+                        <input type="hidden" id="editProductId"/>
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label required" for="editProductNombre">Nombre</label>
+                                <input type="text" id="editProductNombre" class="form-control" required/>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required" for="editProductCategoria">Categoría</label>
+                                <select id="editProductCategoria" class="form-select" required>
+                                    <option value="">Cargando...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required" for="editProductPrecio">Precio (USD)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" min="0.01" id="editProductPrecio" class="form-control" required/>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label required" for="editProductStock">Stock</label>
+                                <input type="number" min="0" id="editProductStock" class="form-control" required/>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-check form-switch mt-4">
+                                    <input class="form-check-input" type="checkbox" id="editProductDestacado"/>
+                                    <span class="form-check-label">Destacado <i class="ti ti-star text-yellow ms-1"></i></span>
+                                </label>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="editProductDescripcion">Descripción</label>
+                                <textarea id="editProductDescripcion" class="form-control" rows="2"></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="editProductImagen">URL de Imagen</label>
+                                <input type="url" id="editProductImagen" class="form-control"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ti ti-check me-1"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CONFIRMAR ELIMINACIÓN -->
+    <div class="modal modal-blur fade" id="deleteProductModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <div class="avatar avatar-xl bg-red-lt rounded-circle mx-auto mb-3">
+                        <i class="ti ti-trash fs-1 text-red"></i>
+                    </div>
+                    <h3 class="text-dark mb-1">¿Eliminar Producto?</h3>
+                    <p class="text-muted small mb-3">
+                        Vas a eliminar: <strong id="deleteProductNombre">-</strong><br>
+                        Esta acción se registrará en el log de auditoría forense.
+                    </p>
+                    <input type="hidden" id="deleteProductId"/>
+                    <div class="d-flex gap-2 justify-content-center">
+                        <button class="btn btn-ghost-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button class="btn btn-danger" id="btnConfirmDelete" onclick="Admin.executeDeleteProduct()">
+                            <i class="ti ti-trash me-1"></i> Confirmar Eliminación
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: INSPECCIÓN PAYLOAD FORENSE -->
+    <div class="modal modal-blur fade" id="auditPayloadModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title text-primary" id="modalAuditAccion">-</h5>
+                        <small class="text-secondary font-monospace" id="modalAuditTimestamp">-</small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3 small">
+                        <span class="text-muted">Actor Responsable:</span>
+                        <strong class="text-dark ms-2" id="modalAuditActor">-</strong>
+                    </div>
+                    <div class="mb-3">
+                        <div class="subheader text-secondary mb-1"><i class="ti ti-history me-1"></i>Estado Previo (dato_anterior):</div>
+                        <div id="modalAuditAnterior" class="json-box"></div>
+                    </div>
+                    <div>
+                        <div class="subheader text-green mb-1"><i class="ti ti-arrow-right me-1"></i>Nuevo Estado / Metadatos (dato_nuevo):</div>
+                        <div id="modalAuditNuevo" class="json-box"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">
+                        <i class="ti ti-x me-1"></i>Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: LOGIN ADMINISTRATIVO & KDS -->
+    <div class="modal modal-blur fade" id="adminLoginModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-md modal-dialog-centered" role="document">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title d-flex align-items-center">
+                        <i class="ti ti-shield-lock me-2 text-primary fs-2"></i> Acceso a Consola Administrativa &amp; KDS
+                    </h5>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-secondary small mb-3">
+                        Inicia sesión con credenciales de personal autorizado (Gerencia, Cocina o Auditoría) para acceder a los módulos de control.
+                    </p>
+                    <form id="adminLoginForm" onsubmit="Admin.handleAdminLogin(event)">
+                        <div class="mb-3">
+                            <label class="form-label required" for="admLoginEmail">Correo Institucional</label>
+                            <div class="input-icon">
+                                <span class="input-icon-addon"><i class="ti ti-mail"></i></span>
+                                <input type="email" id="admLoginEmail" class="form-control" required placeholder="admin@bistrogourmet.com"/>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required" for="admLoginPass">Contraseña</label>
+                            <div class="input-icon">
+                                <span class="input-icon-addon"><i class="ti ti-lock"></i></span>
+                                <input type="password" id="admLoginPass" class="form-control" required placeholder="••••••••"/>
+                            </div>
+                        </div>
+                        <div id="admLoginError" class="text-danger small mb-3"></div>
+                        <button type="submit" class="btn btn-primary w-100 mb-3" id="btnAdminLoginSubmit">
+                            <i class="ti ti-login me-1"></i> Entrar al Panel de Control
+                        </button>
+                    </form>
+
+                    <div class="hr-text text-muted small my-3">o Selecciona un Rol de Demostración</div>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-primary btn-sm text-start d-flex justify-content-between align-items-center" onclick="Admin.quickFillLogin('admin@bistrogourmet.com', 'AdminSec_2026!')">
+                            <span><i class="ti ti-shield me-2 text-primary"></i><strong>Gerente General (Admin)</strong></span>
+                            <span class="badge bg-primary-lt">Control Total</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-warning btn-sm text-start d-flex justify-content-between align-items-center" onclick="Admin.quickFillLogin('cocina@bistrogourmet.com', 'AdminSec_2026!')">
+                            <span><i class="ti ti-flame me-2 text-warning"></i><strong>Jefe de Cocina (KDS)</strong></span>
+                            <span class="badge bg-warning-lt">Tablero Cocina</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm text-start d-flex justify-content-between align-items-center" onclick="Admin.quickFillLogin('auditor@bistrogourmet.com', 'AdminSec_2026!')">
+                            <span><i class="ti ti-file-certificate me-2 text-yellow"></i><strong>Auditor TI (Forense &amp; PCI)</strong></span>
+                            <span class="badge bg-yellow-lt">Auditoría</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light justify-content-between">
+                    <a href="/index.html" class="btn btn-ghost-secondary btn-sm">
+                        <i class="ti ti-arrow-left me-1"></i> Volver a la Tienda Pública
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabler Core JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/js/tabler.min.js"></script>
+
+    <!-- Scripts de la Aplicación -->
+    <script src="js/api.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>
