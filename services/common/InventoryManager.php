@@ -28,19 +28,24 @@ class InventoryManager {
             ];
         }
 
-        // Consultar los ingredientes en la receta del platillo
-        $rStmt = $catDb->prepare("
-            SELECT r.id AS receta_id, r.id_materia_prima, r.cantidad_necesaria, r.unidad_medida AS receta_unidad,
-                   r.es_critico, r.notas,
-                   mp.codigo AS mp_codigo, mp.nombre AS mp_nombre, mp.stock_actual, mp.stock_minimo,
-                   mp.unidad_medida AS mp_unidad, mp.costo_unitario, mp.activo AS mp_activo
-            FROM recetas r
-            JOIN materias_primas mp ON r.id_materia_prima = mp.id
-            WHERE r.id_producto = :pid AND mp.activo = 1
-            ORDER BY r.es_critico DESC, mp.nombre ASC
-        ");
-        $rStmt->execute([':pid' => $productId]);
-        $receta = $rStmt->fetchAll();
+        // Consultar los ingredientes en la receta del platillo (con tolerancia a fallos si la migración aún no se ejecuta)
+        try {
+            $rStmt = $catDb->prepare("
+                SELECT r.id AS receta_id, r.id_materia_prima, r.cantidad_necesaria, r.unidad_medida AS receta_unidad,
+                       r.es_critico, r.notas,
+                       mp.codigo AS mp_codigo, mp.nombre AS mp_nombre, mp.stock_actual, mp.stock_minimo,
+                       mp.unidad_medida AS mp_unidad, mp.costo_unitario, mp.activo AS mp_activo
+                FROM recetas r
+                JOIN materias_primas mp ON r.id_materia_prima = mp.id
+                WHERE r.id_producto = :pid AND mp.activo = 1
+                ORDER BY r.es_critico DESC, mp.nombre ASC
+            ");
+            $rStmt->execute([':pid' => $productId]);
+            $receta = $rStmt->fetchAll();
+        } catch (Throwable $e) {
+            // Tolerancia a fallos: Si las tablas aún no existen en la BD, degradación suave a stock tradicional
+            $receta = [];
+        }
 
         // Caso 1: Platillo sin receta (Artículo directo, ej. bebidas embotelladas)
         if (empty($receta)) {
@@ -190,16 +195,20 @@ class InventoryManager {
                 ];
             }
 
-            // Consultar receta
-            $rStmt = $catDb->prepare("
-                SELECT r.id_materia_prima, r.cantidad_necesaria, r.unidad_medida AS receta_unidad, r.es_critico,
-                       mp.nombre AS mp_nombre, mp.codigo AS mp_codigo, mp.stock_actual, mp.unidad_medida AS mp_unidad
-                FROM recetas r
-                JOIN materias_primas mp ON r.id_materia_prima = mp.id
-                WHERE r.id_producto = :pid AND mp.activo = 1
-            ");
-            $rStmt->execute([':pid' => $prodId]);
-            $receta = $rStmt->fetchAll();
+            // Consultar receta (tolerante a fallos si aún no migran las tablas)
+            try {
+                $rStmt = $catDb->prepare("
+                    SELECT r.id_materia_prima, r.cantidad_necesaria, r.unidad_medida AS receta_unidad, r.es_critico,
+                           mp.nombre AS mp_nombre, mp.codigo AS mp_codigo, mp.stock_actual, mp.unidad_medida AS mp_unidad
+                    FROM recetas r
+                    JOIN materias_primas mp ON r.id_materia_prima = mp.id
+                    WHERE r.id_producto = :pid AND mp.activo = 1
+                ");
+                $rStmt->execute([':pid' => $prodId]);
+                $receta = $rStmt->fetchAll();
+            } catch (Throwable $e) {
+                $receta = [];
+            }
 
             if (empty($receta)) {
                 // Producto sin receta: acumular requerimiento directo
