@@ -564,11 +564,12 @@ const Admin = {
                 if (kpiTotal) kpiTotal.textContent = totalInsumos;
                 if (kpiLow) kpiLow.textContent = lowStock;
                 if (kpiOut) kpiOut.textContent = outStock;
-                if (kpiVal) kpiVal.textContent = `Q${valorTotal.toFixed(2)}`;
+                const valorFormateado = valorTotal.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                if (kpiVal) kpiVal.textContent = `Q${valorFormateado}`;
                 if (kpiBadge) kpiBadge.textContent = `${totalInsumos} Registrados`;
 
                 if (res.data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted">No se encontraron materias primas con los filtros seleccionados.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted">No se encontraron materias primas con los filtros seleccionados.</td></tr>`;
                     return;
                 }
 
@@ -576,45 +577,45 @@ const Admin = {
                     const isOut = m.agotado;
                     const isLow = m.alerta_bajo_stock && !isOut;
 
-                    let statusBadge = `<span class="badge bg-green-lt"><i class="ti ti-check me-1"></i>En Stock</span>`;
+                    let statusBadge = `<span class="badge bg-green-lt fw-bold px-2 py-1"><i class="ti ti-check me-1"></i>En Stock</span>`;
                     if (isOut) {
-                        statusBadge = `<span class="badge bg-red-lt fw-bold"><i class="ti ti-ban me-1"></i>Agotado</span>`;
+                        statusBadge = `<span class="badge bg-red-lt fw-bold px-2 py-1"><i class="ti ti-ban me-1"></i>Agotado</span>`;
                     } else if (isLow) {
-                        statusBadge = `<span class="badge bg-yellow-lt fw-bold"><i class="ti ti-alert-triangle me-1"></i>Stock Bajo</span>`;
+                        statusBadge = `<span class="badge bg-yellow-lt fw-bold px-2 py-1"><i class="ti ti-alert-triangle me-1"></i>Stock Bajo</span>`;
                     }
 
-                    // Unidad badge
-                    let unitColor = 'bg-blue-lt';
-                    if (['g', 'kg', 'lb', 'oz'].includes(m.unidad_medida)) unitColor = 'bg-purple-lt';
-                    else if (['ml', 'l'].includes(m.unidad_medida)) unitColor = 'bg-cyan-lt';
-                    else if (m.unidad_medida === 'unid') unitColor = 'bg-orange-lt';
+                    const costoUnit = parseFloat(m.costo_unitario || 0).toFixed(3);
+                    const valTotal = parseFloat(m.valor_inventario || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
                     return `
                         <tr class="mp-row-${m.id}">
-                            <td class="font-monospace fw-bold text-dark">${m.codigo}</td>
                             <td>
-                                <div class="fw-bold text-dark">${m.nombre}</div>
-                                <small class="text-muted">${m.categoria}</small>
+                                <div class="fw-bold text-dark fs-3 mb-1">${m.nombre}</div>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="badge bg-light text-secondary font-monospace border" style="font-size: 0.72rem;">${m.codigo}</span>
+                                    <span class="badge bg-blue-lt" style="font-size: 0.72rem;">${m.categoria}</span>
+                                </div>
                             </td>
-                            <td><span class="badge bg-light text-primary">${m.categoria}</span></td>
-                            <td><span class="badge ${unitColor} font-monospace text-uppercase">${m.unidad_medida}</span></td>
                             <td>
-                                <span class="font-monospace fw-bold fs-3 ${isOut ? 'text-danger' : (isLow ? 'text-warning' : 'text-dark')}">
+                                <div class="font-monospace fw-bold fs-2 ${isOut ? 'text-danger' : (isLow ? 'text-warning' : 'text-success')}">
                                     ${m.stock_formateado}
-                                </span>
+                                </div>
+                                <small class="text-muted font-monospace d-block">Mínimo: ${m.minimo_formateado}</small>
                             </td>
-                            <td class="text-muted font-monospace small">${m.minimo_formateado}</td>
-                            <td class="font-monospace text-muted">Q${parseFloat(m.costo_unitario).toFixed(3)}</td>
+                            <td>
+                                <div class="font-monospace fw-bold text-dark">Q${costoUnit} <span class="text-muted fw-normal small">/ ${m.unidad_medida}</span></div>
+                                <small class="text-muted font-monospace d-block">Valuación: Q${valTotal}</small>
+                            </td>
                             <td>${statusBadge}</td>
-                            <td class="text-end">
-                                <div class="btn-list justify-content-end">
-                                    <button class="btn btn-outline-green btn-sm" title="Reabastecer / Entrada de compra" onclick="Admin.openMovementModal(${m.id}, 'entrada_compra')">
+                            <td class="text-end" style="white-space: nowrap;">
+                                <div class="btn-list justify-content-end flex-nowrap">
+                                    <button class="btn btn-outline-success btn-sm rounded-pill px-3 shadow-none" title="Reabastecer / Entrada de compra" onclick="Admin.openMovementModal(${m.id}, 'entrada_compra')">
                                         <i class="ti ti-plus me-1"></i>Entrada
                                     </button>
-                                    <button class="btn btn-outline-danger btn-sm" title="Registrar desperdicio o merma de cocina" onclick="Admin.openMovementModal(${m.id}, 'merma_ajuste')">
+                                    <button class="btn btn-outline-danger btn-sm rounded-pill px-3 shadow-none" title="Registrar desperdicio o merma de cocina" onclick="Admin.openMovementModal(${m.id}, 'merma_ajuste')">
                                         <i class="ti ti-minus me-1"></i>Merma
                                     </button>
-                                    <button class="btn btn-outline-cyan btn-sm" title="Ver movimientos históricos en Kardex" onclick="Admin.openKardexModal(${m.id})">
+                                    <button class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-none" title="Ver movimientos históricos en Kardex" onclick="Admin.openKardexModal(${m.id})">
                                         <i class="ti ti-history me-1"></i>Kardex
                                     </button>
                                 </div>
@@ -625,7 +626,7 @@ const Admin = {
             }
         } catch (e) {
             console.error('Error cargando materias primas:', e);
-            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-danger"><i class="ti ti-alert-triangle me-2"></i>Error al cargar materias primas: ${e.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-danger"><i class="ti ti-alert-triangle me-2"></i>Error al cargar materias primas: ${e.message}</td></tr>`;
         }
     },
 
