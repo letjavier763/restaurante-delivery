@@ -423,8 +423,8 @@ class InventoryManager {
 
         $upMpStmt = $catDb->prepare("
             UPDATE materias_primas 
-            SET stock_actual = stock_actual - :cant, updated_at = NOW() 
-            WHERE id = :mp_id AND stock_actual >= :cant
+            SET stock_actual = stock_actual - :cant_deduct, updated_at = NOW() 
+            WHERE id = :mp_id AND stock_actual >= :cant_min
         ");
 
         foreach ($val['mp_requirements'] as $mpId => $req) {
@@ -433,8 +433,9 @@ class InventoryManager {
             $stockNuevo = max(0.000, round($stockAnt - $consumo, 3));
 
             $upMpStmt->execute([
-                ':cant'  => $consumo,
-                ':mp_id' => $mpId
+                ':cant_deduct' => $consumo,
+                ':mp_id'       => $mpId,
+                ':cant_min'    => $consumo,
             ]);
 
             if ($upMpStmt->rowCount() === 0) {
@@ -480,9 +481,13 @@ class InventoryManager {
         }
 
         // 2. Descontar productos directos
-        $upDirectStmt = $catDb->prepare("UPDATE productos SET stock = stock - :cant WHERE id = :id AND stock >= :cant");
+        $upDirectStmt = $catDb->prepare("UPDATE productos SET stock = stock - :cant_deduct WHERE id = :id AND stock >= :cant_min");
         foreach ($val['direct_requirements'] as $prodId => $req) {
-            $upDirectStmt->execute([':cant' => $req['cantidad_total'], ':id' => $prodId]);
+            $upDirectStmt->execute([
+                ':cant_deduct' => $req['cantidad_total'],
+                ':id'          => $prodId,
+                ':cant_min'    => $req['cantidad_total']
+            ]);
             $productosAfectados[] = $prodId;
         }
 
