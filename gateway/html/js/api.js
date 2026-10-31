@@ -213,6 +213,13 @@ const API = {
         });
     },
 
+    async discardExpiredRawMaterial(id) {
+        return this.request(`/api/catalogo/materias-primas/${id}/baja-vencido`, {
+            method: 'POST',
+            body: JSON.stringify({})
+        });
+    },
+
     async addRawMaterialMovement(id, data) {
         return this.request(`/api/catalogo/materias-primas/${id}/movimiento`, {
             method: 'POST',

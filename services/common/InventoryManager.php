@@ -10,6 +10,112 @@ require_once __DIR__ . '/AuditClient.php';
 class InventoryManager {
 
     /**
+     * Estado de un insumo perecedero y qué hacer con él.
+     * Vigente: se cocina con normalidad.
+     * Por vencer: sigue siendo apto, pero la cocina debe usarlo primero.
+     * Vencido: stock utilizable en cero. No se vende ni se cocina; se da de baja como merma.
+     */
+    public static function evaluarFrescura(array $mp): array {
+        $es = (int)($mp['es_perecedero'] ?? 0) === 1;
+        $stock = (float)($mp['stock_actual'] ?? 0);
+        $fechaRaw = $mp['fecha_vencimiento'] ?? null;
+        $alerta = max(0, (int)($mp['dias_alerta'] ?? 3));
+
+        if (!$es) {
+            return [
+                'es_perecedero' => false,
+                'estado_frescura' => 'no_perecedero',
+                'dias_para_vencer' => null,
+                'fecha_vencimiento' => null,
+                'stock_utilizable' => $stock,
+                'accion' => null,
+            ];
+        }
+
+        if ($fechaRaw === null || $fechaRaw === '') {
+            return [
+                'es_perecedero' => true,
+                'estado_frescura' => 'sin_fecha',
+                'dias_para_vencer' => null,
+                'fecha_vencimiento' => null,
+                'stock_utilizable' => $stock,
+                'accion' => 'Asignar fecha de vencimiento antes de usarlo en cocina',
+            ];
+        }
+
+        $fecha = substr((string)$fechaRaw, 0, 10);
+        $hoy = new DateTimeImmutable('today');
+        $vence = DateTimeImmutable::createFromFormat('!Y-m-d', $fecha) ?: $hoy;
+        $dias = (int)$hoy->diff($vence)->format('%r%a');
+
+        if ($dias < 0) {
+            return [
+                'es_perecedero' => true,
+                'estado_frescura' => 'vencido',
+                'dias_para_vencer' => $dias,
+                'fecha_vencimiento' => $fecha,
+                'stock_utilizable' => 0.0,
+                'accion' => 'Dar de baja: merma sanitaria. No se cocina ni se vende.',
+            ];
+        }
+
+        if ($dias <= $alerta) {
+            return [
+                'es_perecedero' => true,
+                'estado_frescura' => 'por_vencer',
+                'dias_para_vencer' => $dias,
+                'fecha_vencimiento' => $fecha,
+                'stock_utilizable' => $stock,
+                'accion' => $dias === 0
+                    ? 'Usar hoy. Mañana ya no es apto.'
+                    : 'Usar primero, antes que el resto de la bodega.',
+            ];
+        }
+
+        return [
+            'es_perecedero' => true,
+            'estado_frescura' => 'vigente',
+            'dias_para_vencer' => $dias,
+            'fecha_vencimiento' => $fecha,
+            'stock_utilizable' => $stock,
+            'accion' => null,
+        ];
+    }
+
+    private static function leerInsumosReceta(PDO $catDb, int $productId, bool $detalle): array {
+        $columnas = $detalle
+            ? "r.id AS receta_id, r.id_materia_prima, r.cantidad_necesaria, r.unidad_medida AS receta_unidad,
+               r.es_critico, r.notas,
+               mp.codigo AS mp_codigo, mp.nombre AS mp_nombre, mp.stock_actual, mp.stock_minimo,
+               mp.unidad_medida AS mp_unidad, mp.costo_unitario, mp.activo AS mp_activo"
+            : "r.id_materia_prima, r.cantidad_necesaria, r.unidad_medida AS receta_unidad, r.es_critico,
+               mp.nombre AS mp_nombre, mp.codigo AS mp_codigo, mp.stock_actual, mp.unidad_medida AS mp_unidad";
+        $frescura = ", mp.es_perecedero, mp.fecha_vencimiento, mp.dias_alerta";
+        $from = "
+            FROM recetas r
+            JOIN materias_primas mp ON r.id_materia_prima = mp.id
+            WHERE r.id_producto = :pid AND mp.activo = 1
+        ";
+        if ($detalle) {
+            $from .= " ORDER BY r.es_critico DESC, mp.nombre ASC";
+        }
+
+        try {
+            $stmt = $catDb->prepare("SELECT {$columnas}{$frescura} {$from}");
+            $stmt->execute([':pid' => $productId]);
+            return $stmt->fetchAll();
+        } catch (Throwable $e) {
+            try {
+                $stmt = $catDb->prepare("SELECT {$columnas} {$from}");
+                $stmt->execute([':pid' => $productId]);
+                return $stmt->fetchAll();
+            } catch (Throwable $e2) {
+                return [];
+            }
+        }
+    }
+
+    /**
      * Calcula la disponibilidad y porciones máximas preparables de un platillo
      */
     public static function calculateProductAvailability(PDO $catDb, int $productId): array {
@@ -28,24 +134,7 @@ class InventoryManager {
             ];
         }
 
-        // Consultar los ingredientes en la receta del platillo (con tolerancia a fallos si la migración aún no se ejecuta)
-        try {
-            $rStmt = $catDb->prepare("
-                SELECT r.id AS receta_id, r.id_materia_prima, r.cantidad_necesaria, r.unidad_medida AS receta_unidad,
-                       r.es_critico, r.notas,
-                       mp.codigo AS mp_codigo, mp.nombre AS mp_nombre, mp.stock_actual, mp.stock_minimo,
-                       mp.unidad_medida AS mp_unidad, mp.costo_unitario, mp.activo AS mp_activo
-                FROM recetas r
-                JOIN materias_primas mp ON r.id_materia_prima = mp.id
-                WHERE r.id_producto = :pid AND mp.activo = 1
-                ORDER BY r.es_critico DESC, mp.nombre ASC
-            ");
-            $rStmt->execute([':pid' => $productId]);
-            $receta = $rStmt->fetchAll();
-        } catch (Throwable $e) {
-            // Tolerancia a fallos: Si las tablas aún no existen en la BD, degradación suave a stock tradicional
-            $receta = [];
-        }
+        $receta = self::leerInsumosReceta($catDb, $productId, true);
 
         // Caso 1: Platillo sin receta (Artículo directo, ej. bebidas embotelladas)
         if (empty($receta)) {
@@ -73,8 +162,11 @@ class InventoryManager {
             $cantReceta = (float)$ing['cantidad_necesaria'];
             $unidadReceta = $ing['receta_unidad'];
             $unidadMp = $ing['mp_unidad'];
-            $stockMp = (float)$ing['stock_actual'];
+            $frescura = self::evaluarFrescura($ing);
+            $stockFisico = (float)$ing['stock_actual'];
+            $stockMp = $frescura['stock_utilizable'];
             $esCritico = (int)$ing['es_critico'] === 1;
+            $vencido = $frescura['estado_frescura'] === 'vencido';
 
             // Convertir cantidad requerida a la unidad de medida del inventario
             $cantEnUnidadMp = UnitConverter::convert($cantReceta, $unidadReceta, $unidadMp);
@@ -95,9 +187,11 @@ class InventoryManager {
                     $bottlenecks[] = [
                         'materia_prima_id'   => (int)$ing['id_materia_prima'],
                         'codigo'             => $ing['mp_codigo'],
-                        'nombre'             => $ing['mp_nombre'],
-                        'stock_actual'       => $stockMp,
-                        'stock_formateado'   => UnitConverter::format($stockMp, $unidadMp),
+                        'nombre'             => $vencido ? ($ing['mp_nombre'] . ' (vencido)') : $ing['mp_nombre'],
+                        'stock_actual'       => $stockFisico,
+                        'stock_utilizable'   => $stockMp,
+                        'estado_frescura'    => $frescura['estado_frescura'],
+                        'stock_formateado'   => UnitConverter::format($vencido ? $stockFisico : $stockMp, $unidadMp),
                         'requerido_porcion'  => $cantEnUnidadMp,
                         'requerido_formateado'=> UnitConverter::format($cantReceta, $unidadReceta),
                         'unidad_medida'      => $unidadMp,
@@ -113,7 +207,10 @@ class InventoryManager {
                 'unidad_receta'      => $unidadReceta,
                 'cantidad_en_unidad_mp' => $cantEnUnidadMp,
                 'unidad_mp'          => $unidadMp,
-                'stock_actual'       => $stockMp,
+                'stock_actual'       => $stockFisico,
+                'stock_utilizable'   => $stockMp,
+                'estado_frescura'    => $frescura['estado_frescura'],
+                'fecha_vencimiento'  => $frescura['fecha_vencimiento'],
                 'porciones_posibles' => $porcionesPosibles,
                 'costo_unitario'     => (float)$ing['costo_unitario'],
                 'costo_porcion'      => $costoIngrediente,
@@ -195,20 +292,7 @@ class InventoryManager {
                 ];
             }
 
-            // Consultar receta (tolerante a fallos si aún no migran las tablas)
-            try {
-                $rStmt = $catDb->prepare("
-                    SELECT r.id_materia_prima, r.cantidad_necesaria, r.unidad_medida AS receta_unidad, r.es_critico,
-                           mp.nombre AS mp_nombre, mp.codigo AS mp_codigo, mp.stock_actual, mp.unidad_medida AS mp_unidad
-                    FROM recetas r
-                    JOIN materias_primas mp ON r.id_materia_prima = mp.id
-                    WHERE r.id_producto = :pid AND mp.activo = 1
-                ");
-                $rStmt->execute([':pid' => $prodId]);
-                $receta = $rStmt->fetchAll();
-            } catch (Throwable $e) {
-                $receta = [];
-            }
+            $receta = self::leerInsumosReceta($catDb, $prodId, false);
 
             if (empty($receta)) {
                 // Producto sin receta: acumular requerimiento directo
@@ -225,6 +309,7 @@ class InventoryManager {
                 // Producto con receta: acumular materias primas requeridas
                 foreach ($receta as $ing) {
                     $mpId = (int)$ing['id_materia_prima'];
+                    $frescura = self::evaluarFrescura($ing);
                     $cantEnUnidadMp = UnitConverter::convert((float)$ing['cantidad_necesaria'], $ing['receta_unidad'], $ing['mp_unidad']);
                     $consumoTotalItem = $cantEnUnidadMp * $cantidad;
 
@@ -234,7 +319,9 @@ class InventoryManager {
                             'codigo'            => $ing['mp_codigo'],
                             'nombre'            => $ing['mp_nombre'],
                             'unidad_medida'     => $ing['mp_unidad'],
-                            'stock_actual'      => (float)$ing['stock_actual'],
+                            'stock_actual'      => $frescura['stock_utilizable'],
+                            'stock_fisico'      => (float)$ing['stock_actual'],
+                            'estado_frescura'   => $frescura['estado_frescura'],
                             'total_requerido'   => 0.0,
                             'platillos'         => []
                         ];
@@ -266,10 +353,15 @@ class InventoryManager {
                 $reqFmt = UnitConverter::format($requerido, $req['unidad_medida']);
                 $dispFmt = UnitConverter::format($disponible, $req['unidad_medida']);
                 $defFmt = UnitConverter::format($deficit, $req['unidad_medida']);
+                $errorStock = "Stock insuficiente de materia prima para completar tu orden. El insumo '{$req['nombre']}' solo cuenta con {$dispFmt} en bodega (la orden requiere {$reqFmt}; faltan {$defFmt}).";
+                if (($req['estado_frescura'] ?? '') === 'vencido') {
+                    $fisico = UnitConverter::format((float)($req['stock_fisico'] ?? 0), $req['unidad_medida']);
+                    $errorStock = "El insumo '{$req['nombre']}' está vencido ({$fisico} en bodega, no aptos). No se puede preparar el pedido: hay que darlo de baja y reponerlo.";
+                }
 
                 return [
                     'valid'               => false,
-                    'error'               => "Stock insuficiente de materia prima para completar tu orden. El insumo '{$req['nombre']}' solo cuenta con {$dispFmt} en bodega (la orden requiere {$reqFmt}; faltan {$defFmt}).",
+                    'error'               => $errorStock,
                     'insumo_insuficiente' => [
                         'materia_prima_id'=> $mpId,
                         'nombre'          => $req['nombre'],

@@ -35,6 +35,22 @@ function getRedis(): ?Redis {
     return null;
 }
 
+function enriquecerMateriaPrima(array $mp): array {
+    $f = InventoryManager::evaluarFrescura($mp);
+    $mp['es_perecedero'] = $f['es_perecedero'] ? 1 : 0;
+    $mp['estado_frescura'] = $f['estado_frescura'];
+    $mp['dias_para_vencer'] = $f['dias_para_vencer'];
+    $mp['fecha_vencimiento'] = $f['fecha_vencimiento'];
+    $mp['stock_utilizable'] = $f['stock_utilizable'];
+    $mp['accion_recomendada'] = $f['accion'];
+    return $mp;
+}
+
+function fechaVencimientoValida($valor): ?string {
+    $fecha = is_string($valor) ? substr(trim($valor), 0, 10) : '';
+    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) ? $fecha : null;
+}
+
 function invalidateCatalogueCache(): void {
     $r = getRedis();
     if ($r) {
@@ -522,11 +538,13 @@ try {
         $bajoStock = isset($_GET['bajo_stock']) ? (int)$_GET['bajo_stock'] : null;
         $search = isset($_GET['q']) ? Security::sanitizeString($_GET['q']) : null;
 
-        $sql = "
-            SELECT id, codigo, nombre, categoria, unidad_medida, stock_actual, stock_minimo, costo_unitario, activo, updated_at
+        $columnasMp = "id, codigo, nombre, categoria, unidad_medida, stock_actual, stock_minimo, costo_unitario, activo, updated_at";
+        $columnasFrescura = ", es_perecedero, fecha_vencimiento, dias_alerta";
+        $sqlBase = "
             FROM materias_primas
             WHERE activo = 1
         ";
+        $sql = "SELECT {$columnasMp}{$columnasFrescura} {$sqlBase}";
         $params = [];
 
         if ($categoria) {
@@ -537,24 +555,42 @@ try {
             $sql .= " AND stock_actual <= stock_minimo";
         }
         if ($search) {
-            $sql .= " AND (nombre LIKE :search OR codigo LIKE :search OR categoria LIKE :search)";
-            $params[':search'] = "%{$search}%";
+            $sql .= " AND (nombre LIKE :search_nombre OR codigo LIKE :search_codigo OR categoria LIKE :search_categoria)";
+            $params[':search_nombre'] = "%{$search}%";
+            $params[':search_codigo'] = "%{$search}%";
+            $params[':search_categoria'] = "%{$search}%";
         }
         $sql .= " ORDER BY (stock_actual <= stock_minimo) DESC, categoria ASC, nombre ASC";
 
+        $sufijo = substr($sql, strlen("SELECT {$columnasMp}{$columnasFrescura} {$sqlBase}"));
+        $sqlSinFrescura = "SELECT {$columnasMp} {$sqlBase}" . $sufijo;
+
+        $cargarMaterias = function (PDO $db, bool $permitirSinFrescura) use ($sql, $sqlSinFrescura, $params) {
+            try {
+                $stmt = $db->prepare($sql);
+                $stmt->execute($params);
+                return $stmt->fetchAll();
+            } catch (Throwable $e) {
+                if (!$permitirSinFrescura) {
+                    throw $e;
+                }
+                $stmt = $db->prepare($sqlSinFrescura);
+                $stmt->execute($params);
+                return $stmt->fetchAll();
+            }
+        };
+
         try {
             $db = Database::getSlaveConnection($_ENV['DB_CATALOGO_NAME'] ?? 'catalogo_db');
-            $stmt = $db->prepare($sql);
-            $stmt->execute($params);
-            $mps = $stmt->fetchAll();
+            $mps = $cargarMaterias($db, false);
         } catch (Throwable $e) {
             $db = Database::getMasterConnection($_ENV['DB_CATALOGO_NAME'] ?? 'catalogo_db');
-            $stmt = $db->prepare($sql);
-            $stmt->execute($params);
-            $mps = $stmt->fetchAll();
+            $mps = $cargarMaterias($db, true);
         }
 
+        $resumenFrescura = ['vencidos' => 0, 'por_vencer' => 0, 'vigentes' => 0, 'sin_fecha' => 0];
         foreach ($mps as &$mp) {
+            $mp = enriquecerMateriaPrima($mp);
             $stockVal = (float)$mp['stock_actual'];
             $minVal = (float)$mp['stock_minimo'];
             $mp['stock_formateado'] = UnitConverter::format($stockVal, $mp['unidad_medida']);
@@ -562,9 +598,31 @@ try {
             $mp['alerta_bajo_stock'] = ($stockVal <= $minVal);
             $mp['agotado'] = ($stockVal <= 0.0001);
             $mp['valor_inventario'] = round($stockVal * (float)$mp['costo_unitario'], 2);
+            $clave = [
+                'vencido' => 'vencidos',
+                'por_vencer' => 'por_vencer',
+                'vigente' => 'vigentes',
+                'sin_fecha' => 'sin_fecha',
+            ][$mp['estado_frescura']] ?? null;
+            if ($clave) {
+                $resumenFrescura[$clave]++;
+            }
+        }
+        unset($mp);
+
+        $filtroFrescura = isset($_GET['frescura']) ? Security::sanitizeString($_GET['frescura']) : null;
+        if ($filtroFrescura === 'atencion') {
+            $mps = array_values(array_filter($mps, function ($m) {
+                return in_array($m['estado_frescura'], ['vencido', 'por_vencer', 'sin_fecha'], true);
+            }));
         }
 
-        Security::jsonResponse(['success' => true, 'total' => count($mps), 'data' => $mps]);
+        Security::jsonResponse([
+            'success' => true,
+            'total' => count($mps),
+            'resumen_frescura' => $resumenFrescura,
+            'data' => $mps
+        ]);
     }
 
     // OBTENER MATERIA PRIMA POR ID CON PLATILLOS QUE LA UTILIZAN
@@ -589,6 +647,7 @@ try {
         ");
         $platStmt->execute([':mp_id' => $id]);
         $mp['platillos_receta'] = $platStmt->fetchAll();
+        $mp = enriquecerMateriaPrima($mp);
         $mp['stock_formateado'] = UnitConverter::format((float)$mp['stock_actual'], $mp['unidad_medida']);
 
         Security::jsonResponse(['success' => true, 'data' => $mp]);
@@ -610,6 +669,8 @@ try {
         $stockActual   = max(0.000, Security::sanitizeFloat($input['stock_actual'] ?? 0));
         $stockMinimo   = max(0.000, Security::sanitizeFloat($input['stock_minimo'] ?? 5));
         $costoUnitario = max(0.00, Security::sanitizeFloat($input['costo_unitario'] ?? 0));
+        $fechaVenc     = fechaVencimientoValida($input['fecha_vencimiento'] ?? null);
+        $esPerecedero  = !empty($input['es_perecedero']) || $fechaVenc !== null ? 1 : 0;
 
         if (empty($codigo) || empty($nombre) || empty($unidadMedida)) {
             Security::jsonResponse(['success' => false, 'error' => 'Código, nombre y unidad de medida son obligatorios'], 400);
@@ -624,19 +685,37 @@ try {
             Security::jsonResponse(['success' => false, 'error' => "El código de insumo '{$codigo}' ya existe"], 409);
         }
 
-        $ins = $masterDb->prepare("
-            INSERT INTO materias_primas (codigo, nombre, categoria, unidad_medida, stock_actual, stock_minimo, costo_unitario, activo, created_at)
-            VALUES (:cod, :nom, :cat, :um, :stock, :min, :cost, 1, NOW())
-        ");
-        $ins->execute([
-            ':cod'   => $codigo,
-            ':nom'   => $nombre,
-            ':cat'   => $categoria,
-            ':um'    => $unidadMedida,
-            ':stock' => $stockActual,
-            ':min'   => $stockMinimo,
-            ':cost'  => $costoUnitario
-        ]);
+        try {
+            $ins = $masterDb->prepare("
+                INSERT INTO materias_primas (codigo, nombre, categoria, unidad_medida, stock_actual, stock_minimo, costo_unitario, es_perecedero, fecha_vencimiento, dias_alerta, activo, created_at)
+                VALUES (:cod, :nom, :cat, :um, :stock, :min, :cost, :perec, :vence, 3, 1, NOW())
+            ");
+            $ins->execute([
+                ':cod'   => $codigo,
+                ':nom'   => $nombre,
+                ':cat'   => $categoria,
+                ':um'    => $unidadMedida,
+                ':stock' => $stockActual,
+                ':min'   => $stockMinimo,
+                ':cost'  => $costoUnitario,
+                ':perec' => $esPerecedero,
+                ':vence' => $fechaVenc
+            ]);
+        } catch (Throwable $e) {
+            $ins = $masterDb->prepare("
+                INSERT INTO materias_primas (codigo, nombre, categoria, unidad_medida, stock_actual, stock_minimo, costo_unitario, activo, created_at)
+                VALUES (:cod, :nom, :cat, :um, :stock, :min, :cost, 1, NOW())
+            ");
+            $ins->execute([
+                ':cod'   => $codigo,
+                ':nom'   => $nombre,
+                ':cat'   => $categoria,
+                ':um'    => $unidadMedida,
+                ':stock' => $stockActual,
+                ':min'   => $stockMinimo,
+                ':cost'  => $costoUnitario
+            ]);
+        }
         $newId = (int)$masterDb->lastInsertId();
 
         // Registro de movimiento inicial si vino con stock > 0
@@ -701,24 +780,135 @@ try {
         $unidadMedida  = UnitConverter::normalize(Security::sanitizeString($input['unidad_medida'] ?? $anterior['unidad_medida']));
         $stockMinimo   = max(0.000, Security::sanitizeFloat($input['stock_minimo'] ?? $anterior['stock_minimo']));
         $costoUnitario = max(0.00, Security::sanitizeFloat($input['costo_unitario'] ?? $anterior['costo_unitario']));
+        $fechaVenc     = array_key_exists('fecha_vencimiento', $input)
+            ? fechaVencimientoValida($input['fecha_vencimiento'])
+            : ($anterior['fecha_vencimiento'] ?? null);
+        $esPerecedero  = array_key_exists('es_perecedero', $input)
+            ? (!empty($input['es_perecedero']) || $fechaVenc !== null ? 1 : 0)
+            : (int)($anterior['es_perecedero'] ?? ($fechaVenc !== null ? 1 : 0));
 
-        $up = $masterDb->prepare("
-            UPDATE materias_primas 
-            SET nombre = :nom, categoria = :cat, unidad_medida = :um, stock_minimo = :min, costo_unitario = :cost, updated_at = NOW()
-            WHERE id = :id
-        ");
-        $up->execute([
-            ':nom'  => $nombre,
-            ':cat'  => $categoria,
-            ':um'   => $unidadMedida,
-            ':min'  => $stockMinimo,
-            ':cost' => $costoUnitario,
-            ':id'   => $id
-        ]);
+        try {
+            $up = $masterDb->prepare("
+                UPDATE materias_primas 
+                SET nombre = :nom, categoria = :cat, unidad_medida = :um, stock_minimo = :min, costo_unitario = :cost,
+                    es_perecedero = :perec, fecha_vencimiento = :vence, updated_at = NOW()
+                WHERE id = :id
+            ");
+            $up->execute([
+                ':nom'   => $nombre,
+                ':cat'   => $categoria,
+                ':um'    => $unidadMedida,
+                ':min'   => $stockMinimo,
+                ':cost'  => $costoUnitario,
+                ':perec' => $esPerecedero,
+                ':vence' => $fechaVenc,
+                ':id'    => $id
+            ]);
+        } catch (Throwable $e) {
+            $up = $masterDb->prepare("
+                UPDATE materias_primas 
+                SET nombre = :nom, categoria = :cat, unidad_medida = :um, stock_minimo = :min, costo_unitario = :cost, updated_at = NOW()
+                WHERE id = :id
+            ");
+            $up->execute([
+                ':nom'  => $nombre,
+                ':cat'  => $categoria,
+                ':um'   => $unidadMedida,
+                ':min'  => $stockMinimo,
+                ':cost' => $costoUnitario,
+                ':id'   => $id
+            ]);
+        }
 
         invalidateCatalogueCache();
 
         Security::jsonResponse(['success' => true, 'message' => 'Materia prima actualizada correctamente']);
+    }
+
+    // BAJA SANITARIA DE UN INSUMO VENCIDO (Admin / Cocina)
+    if ($method === 'POST' && preg_match('#^/materias-primas/([0-9]+)/baja-vencido$#', $path, $matches)) {
+        $token = JWT::getBearerToken();
+        $user = $token ? JWT::decode($token) : null;
+        if (!$user || !in_array($user['rol'] ?? '', ['admin', 'cocina'], true)) {
+            Security::jsonResponse(['success' => false, 'error' => 'Acceso restringido a administradores y cocina'], 403);
+        }
+
+        $id = (int)$matches[1];
+        $masterDb = Database::getMasterConnection($_ENV['DB_CATALOGO_NAME'] ?? 'catalogo_db');
+        $stmt = $masterDb->prepare("SELECT * FROM materias_primas WHERE id = :id AND activo = 1 LIMIT 1");
+        $stmt->execute([':id' => $id]);
+        $mp = $stmt->fetch();
+        if (!$mp) {
+            Security::jsonResponse(['success' => false, 'error' => 'Materia prima no encontrada'], 404);
+        }
+
+        $frescura = InventoryManager::evaluarFrescura($mp);
+        if ($frescura['estado_frescura'] !== 'vencido') {
+            Security::jsonResponse([
+                'success' => false,
+                'error' => 'Solo se da de baja un insumo ya vencido. Si está por vencer, la cocina debe usarlo primero.'
+            ], 400);
+        }
+
+        $stockAnterior = (float)$mp['stock_actual'];
+        if ($stockAnterior <= 0.0001) {
+            Security::jsonResponse(['success' => false, 'error' => 'Este insumo vencido ya no tiene stock en bodega'], 400);
+        }
+
+        $motivo = 'Baja sanitaria por vencimiento (' . $frescura['fecha_vencimiento'] . '). No apto para consumo.';
+        $masterDb->beginTransaction();
+        try {
+            $upStmt = $masterDb->prepare("UPDATE materias_primas SET stock_actual = 0, updated_at = NOW() WHERE id = :id");
+            $upStmt->execute([':id' => $id]);
+
+            $insMov = $masterDb->prepare("
+                INSERT INTO movimientos_inventario
+                (id_materia_prima, tipo_movimiento, cantidad, stock_anterior, stock_nuevo, unidad_medida, referencia_tipo, referencia_id, motivo, usuario_id, usuario_email, created_at)
+                VALUES (:mp_id, 'merma_ajuste', :cant, :ant, 0, :um, 'baja_vencimiento', :ref_id, :motivo, :uid, :uemail, NOW())
+            ");
+            $insMov->execute([
+                ':mp_id'  => $id,
+                ':cant'   => -$stockAnterior,
+                ':ant'    => $stockAnterior,
+                ':um'     => $mp['unidad_medida'],
+                ':ref_id' => 'VENC-' . date('Ymd-His'),
+                ':motivo' => $motivo,
+                ':uid'    => $user['id'],
+                ':uemail' => $user['email']
+            ]);
+
+            $platStmt = $masterDb->prepare("SELECT DISTINCT id_producto FROM recetas WHERE id_materia_prima = :mp_id");
+            $platStmt->execute([':mp_id' => $id]);
+            $afectados = $platStmt->fetchAll();
+            foreach ($afectados as $af) {
+                InventoryManager::syncProductStock($masterDb, (int)$af['id_producto']);
+            }
+            $masterDb->commit();
+        } catch (Throwable $e) {
+            $masterDb->rollBack();
+            throw $e;
+        }
+
+        invalidateCatalogueCache();
+        AuditClient::log(
+            'INVENTARIO_ACTUALIZADO',
+            'catalogo-service',
+            (int)$user['id'],
+            $user['email'],
+            $user['rol'] ?? 'cocina',
+            null, null,
+            ['materia_prima_id' => $id, 'nombre' => $mp['nombre'], 'stock_anterior' => $stockAnterior, 'fecha_vencimiento' => $frescura['fecha_vencimiento']],
+            ['materia_prima_id' => $id, 'stock_nuevo' => 0, 'accion' => 'baja_vencido', 'motivo' => $motivo],
+            'EXITO'
+        );
+
+        Security::jsonResponse([
+            'success' => true,
+            'message' => "Baja registrada. {$mp['nombre']} salió de bodega como merma y ya no se usa en cocina.",
+            'materia_prima_id' => $id,
+            'stock_dado_de_baja' => $stockAnterior,
+            'unidad_medida' => $mp['unidad_medida']
+        ]);
     }
 
     // REGISTRAR MOVIMIENTO DE ENTRADA, MERMA O AJUSTE EN KARDEX (Admin / Cocina)
@@ -746,7 +936,7 @@ try {
         }
 
         $masterDb = Database::getMasterConnection($_ENV['DB_CATALOGO_NAME'] ?? 'catalogo_db');
-        $stmt = $masterDb->prepare("SELECT id, codigo, nombre, unidad_medida, stock_actual, stock_minimo FROM materias_primas WHERE id = :id AND activo = 1 LIMIT 1");
+        $stmt = $masterDb->prepare("SELECT * FROM materias_primas WHERE id = :id AND activo = 1 LIMIT 1");
         $stmt->execute([':id' => $id]);
         $mp = $stmt->fetch();
 
@@ -782,6 +972,23 @@ try {
             // Actualizar stock de la materia prima
             $upStmt = $masterDb->prepare("UPDATE materias_primas SET stock_actual = :st, updated_at = NOW() WHERE id = :id");
             $upStmt->execute([':st' => $stockNuevo, ':id' => $id]);
+
+            if ($tipoMovimiento === 'entrada_compra') {
+                $nuevaFecha = fechaVencimientoValida($input['fecha_vencimiento'] ?? null);
+                if ($nuevaFecha !== null) {
+                    $fechaFinal = $nuevaFecha;
+                    $fechaActual = $mp['fecha_vencimiento'] ?? null;
+                    if ($stockAnterior > 0 && !empty($fechaActual) && substr((string)$fechaActual, 0, 10) < $nuevaFecha) {
+                        $fechaFinal = substr((string)$fechaActual, 0, 10);
+                    }
+                    try {
+                        $fecStmt = $masterDb->prepare("UPDATE materias_primas SET es_perecedero = 1, fecha_vencimiento = :f WHERE id = :id");
+                        $fecStmt->execute([':f' => $fechaFinal, ':id' => $id]);
+                    } catch (Throwable $e) {
+                        // La columna aún no existe en instalaciones sin migrar.
+                    }
+                }
+            }
 
             // Registrar movimiento en el kardex
             $insMov = $masterDb->prepare("

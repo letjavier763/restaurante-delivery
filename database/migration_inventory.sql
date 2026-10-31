@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS `materias_primas` (
     `stock_actual` DECIMAL(12, 3) NOT NULL DEFAULT 0.000,
     `stock_minimo` DECIMAL(12, 3) NOT NULL DEFAULT 5.000,
     `costo_unitario` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    `es_perecedero` TINYINT(1) NOT NULL DEFAULT 0,
+    `fecha_vencimiento` DATE NULL,
+    `dias_alerta` INT NOT NULL DEFAULT 3,
     `activo` TINYINT(1) NOT NULL DEFAULT 1,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -238,4 +241,36 @@ ON DUPLICATE KEY UPDATE
 
 -- 6. MARCAR PLATILLO 11 COMO AGOTADO (POR FALTA DE PROSCIUTTO)
 UPDATE `productos` SET `stock` = 0 WHERE `id` = 11;
+
+-- 7. PERECEDEROS: columnas para instalaciones que ya tenían la tabla
+ALTER TABLE `materias_primas`
+    ADD COLUMN IF NOT EXISTS `es_perecedero` TINYINT(1) NOT NULL DEFAULT 0 AFTER `costo_unitario`,
+    ADD COLUMN IF NOT EXISTS `fecha_vencimiento` DATE NULL AFTER `es_perecedero`,
+    ADD COLUMN IF NOT EXISTS `dias_alerta` INT NOT NULL DEFAULT 3 AFTER `fecha_vencimiento`;
+
+-- Carnes, lácteos, verduras y pan fresco llevan fecha. Aceites y licores no.
+UPDATE `materias_primas`
+SET `es_perecedero` = 1, `dias_alerta` = 3, `fecha_vencimiento` = DATE_ADD(CURDATE(), INTERVAL 6 DAY)
+WHERE `categoria` IN ('Carnes & Proteínas', 'Verduras & Vegetales')
+  AND `fecha_vencimiento` IS NULL;
+
+UPDATE `materias_primas`
+SET `es_perecedero` = 1, `dias_alerta` = 3, `fecha_vencimiento` = DATE_ADD(CURDATE(), INTERVAL 12 DAY)
+WHERE `categoria` = 'Lácteos & Quesos'
+  AND `fecha_vencimiento` IS NULL;
+
+UPDATE `materias_primas`
+SET `es_perecedero` = 1, `dias_alerta` = 2, `fecha_vencimiento` = DATE_ADD(CURDATE(), INTERVAL 4 DAY)
+WHERE `codigo` IN ('MP-PAN-BRIOCHE', 'MP-FOCACCIA-ROMERO', 'MP-FETTUCCINE-FRESCO', 'MP-MASA-MADRE-PIZZA')
+  AND `fecha_vencimiento` IS NULL;
+
+-- Ejemplos de qué hacer: vencido = baja; por vencer = usar primero.
+UPDATE `materias_primas` SET `es_perecedero` = 1, `dias_alerta` = 3, `fecha_vencimiento` = DATE_SUB(CURDATE(), INTERVAL 1 DAY) WHERE `codigo` = 'MP-SALMON-NORUEGO';
+UPDATE `materias_primas` SET `es_perecedero` = 1, `dias_alerta` = 3, `fecha_vencimiento` = DATE_SUB(CURDATE(), INTERVAL 2 DAY) WHERE `codigo` = 'MP-ATUN-ROJO';
+UPDATE `materias_primas` SET `es_perecedero` = 1, `dias_alerta` = 3, `fecha_vencimiento` = DATE_SUB(CURDATE(), INTERVAL 1 DAY) WHERE `codigo` = 'MP-RUCULA-SILVESTRE';
+UPDATE `materias_primas` SET `es_perecedero` = 1, `dias_alerta` = 3, `fecha_vencimiento` = DATE_ADD(CURDATE(), INTERVAL 1 DAY) WHERE `codigo` = 'MP-LECHUGA-ROMANA';
+UPDATE `materias_primas` SET `es_perecedero` = 1, `dias_alerta` = 3, `fecha_vencimiento` = CURDATE() WHERE `codigo` = 'MP-ALBAHACA-GENOVESA';
+UPDATE `materias_primas` SET `es_perecedero` = 1, `dias_alerta` = 3, `fecha_vencimiento` = DATE_ADD(CURDATE(), INTERVAL 2 DAY) WHERE `codigo` = 'MP-AGUACATE-HASS';
+UPDATE `materias_primas` SET `es_perecedero` = 1, `dias_alerta` = 3, `fecha_vencimiento` = DATE_ADD(CURDATE(), INTERVAL 2 DAY) WHERE `codigo` = 'MP-QUESO-RICOTTA';
+UPDATE `materias_primas` SET `es_perecedero` = 1, `dias_alerta` = 2, `fecha_vencimiento` = DATE_ADD(CURDATE(), INTERVAL 1 DAY) WHERE `codigo` = 'MP-PAN-BRIOCHE';
 

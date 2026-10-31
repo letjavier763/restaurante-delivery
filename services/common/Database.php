@@ -49,6 +49,9 @@ class Database {
             PDO::ATTR_EMULATE_PREPARES   => false, // Previene SQL Injection real
             PDO::ATTR_TIMEOUT            => 5,
         ];
+        if (defined('PDO::MYSQL_ATTR_CONNECT_TIMEOUT')) {
+            $options[PDO::MYSQL_ATTR_CONNECT_TIMEOUT] = 3;
+        }
 
         try {
             return new PDO($dsn, $user, $pass, $options);

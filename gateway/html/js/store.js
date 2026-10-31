@@ -344,7 +344,7 @@ const Store = {
             const stockBadge = inStock 
                 ? `<span class="badge-portion-pill text-green"><i class="ti ti-circle-check-filled text-green"></i> ${porciones} disponibles</span>`
                 : (prod.insumos_faltantes && prod.insumos_faltantes.length 
-                    ? `<span class="badge-portion-pill text-danger" title="Insumos faltantes: ${prod.insumos_faltantes.join(', ')}"><i class="ti ti-alert-triangle text-danger"></i> Agotado</span>`
+                    ? `<span class="badge-portion-pill text-danger" title="Insumos faltantes: ${prod.insumos_faltantes.join(', ')}"><i class="ti ti-alert-triangle text-danger"></i> ${prod.insumos_faltantes.some(n => /vencido/i.test(n)) ? 'Insumo vencido' : 'Agotado'}</span>`
                     : `<span class="badge-portion-pill text-danger"><i class="ti ti-ban text-danger"></i> Agotado</span>`);
 
             const ribbonHtml = prod.destacado == 1 
@@ -857,12 +857,13 @@ const Store = {
             const faltantes = (prod.insumos_faltantes && prod.insumos_faltantes.length) 
                 ? prod.insumos_faltantes.join(', ') 
                 : 'Materia prima no disponible';
+            const hayVencido = /vencido/i.test(faltantes);
             specsHtml += `
                 <div class="alert alert-danger py-2 px-3 small d-flex align-items-center mb-2">
                     <i class="ti ti-alert-triangle me-2 fs-2"></i>
                     <div>
-                        <strong>Platillo no disponible:</strong> No contamos con ingredientes o stock suficiente en cocina para prepararlo hoy.
-                        <div class="text-muted mt-1 small">Insumo agotado: <strong>${faltantes}</strong></div>
+                        <strong>Platillo no disponible:</strong> ${hayVencido ? 'Un ingrediente venció y no se puede cocinar hasta reponerlo.' : 'No contamos con ingredientes o stock suficiente en cocina para prepararlo hoy.'}
+                        <div class="text-muted mt-1 small">${hayVencido ? 'Insumo vencido' : 'Insumo agotado'}: <strong>${faltantes}</strong></div>
                     </div>
                 </div>
             `;

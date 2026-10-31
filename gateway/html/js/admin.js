@@ -11,6 +11,7 @@ const Admin = {
     allProducts: [],
     allRawMaterials: [],
     filterLowStockOnly: false,
+    filterPerishableOnly: false,
     currentRecipeData: null,
     allUsers: [],
     allOrders: [],
@@ -540,6 +541,7 @@ const Admin = {
         try {
             const params = {};
             if (this.filterLowStockOnly) params.bajo_stock = 1;
+            if (this.filterPerishableOnly) params.frescura = 'atencion';
             const cat = document.getElementById('filterMpCategoria')?.value;
             if (cat) params.categoria = cat;
             const search = document.getElementById('filterMpSearch')?.value;
@@ -568,6 +570,20 @@ const Admin = {
                 if (kpiVal) kpiVal.textContent = `Q${valorFormateado}`;
                 if (kpiBadge) kpiBadge.textContent = `${totalInsumos} Registrados`;
 
+                const resumen = res.resumen_frescura || {};
+                const alerta = document.getElementById('alertaPerecederos');
+                if (alerta) {
+                    const vencidos = resumen.vencidos || 0;
+                    const porVencer = resumen.por_vencer || 0;
+                    if (vencidos || porVencer) {
+                        alerta.classList.remove('d-none');
+                        alerta.innerHTML = `<strong>Perecederos.</strong> ${vencidos} vencido(s): no se venden ni se cocinan, hay que darlos de baja como merma. ${porVencer} por vencer: la cocina debe usarlos primero.`;
+                    } else {
+                        alerta.classList.add('d-none');
+                        alerta.innerHTML = '';
+                    }
+                }
+
                 if (res.data.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted">No se encontraron materias primas con los filtros seleccionados.</td></tr>`;
                     return;
@@ -576,12 +592,20 @@ const Admin = {
                 tbody.innerHTML = res.data.map(m => {
                     const isOut = m.agotado;
                     const isLow = m.alerta_bajo_stock && !isOut;
+                    const frescura = m.estado_frescura || 'no_perecedero';
+                    const venceTxt = m.fecha_vencimiento ? ` · vence ${m.fecha_vencimiento}` : '';
 
                     let statusBadge = `<span class="badge bg-green-lt fw-bold px-2 py-1"><i class="ti ti-check me-1"></i>En Stock</span>`;
-                    if (isOut) {
+                    if (frescura === 'vencido') {
+                        statusBadge = `<span class="badge bg-red-lt fw-bold px-2 py-1" title="${m.accion_recomendada || ''}"><i class="ti ti-ban me-1"></i>Vencido${venceTxt}</span>`;
+                    } else if (frescura === 'por_vencer') {
+                        statusBadge = `<span class="badge bg-orange-lt fw-bold px-2 py-1" title="${m.accion_recomendada || ''}"><i class="ti ti-clock-exclamation me-1"></i>Por vencer${venceTxt}</span>`;
+                    } else if (isOut) {
                         statusBadge = `<span class="badge bg-red-lt fw-bold px-2 py-1"><i class="ti ti-ban me-1"></i>Agotado</span>`;
                     } else if (isLow) {
                         statusBadge = `<span class="badge bg-yellow-lt fw-bold px-2 py-1"><i class="ti ti-alert-triangle me-1"></i>Stock Bajo</span>`;
+                    } else if (frescura === 'vigente') {
+                        statusBadge = `<span class="badge bg-green-lt fw-bold px-2 py-1"><i class="ti ti-check me-1"></i>Fresco${venceTxt}</span>`;
                     }
 
                     const costoUnit = parseFloat(m.costo_unitario || 0).toFixed(3);
@@ -615,6 +639,7 @@ const Admin = {
                                     <button class="btn btn-outline-danger btn-sm rounded-pill px-3 shadow-none" title="Registrar desperdicio o merma de cocina" onclick="Admin.openMovementModal(${m.id}, 'merma_ajuste')">
                                         <i class="ti ti-minus me-1"></i>Merma
                                     </button>
+                                    ${frescura === 'vencido' && !isOut ? `<button class="btn btn-danger btn-sm rounded-pill px-3 shadow-none" title="Sacar de bodega el stock vencido" onclick="Admin.discardExpired(${m.id})"><i class="ti ti-trash me-1"></i>Dar de baja</button>` : ''}
                                     <button class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-none" title="Ver movimientos históricos en Kardex" onclick="Admin.openKardexModal(${m.id})">
                                         <i class="ti ti-history me-1"></i>Kardex
                                     </button>
@@ -641,6 +666,30 @@ const Admin = {
         this.loadInventoryAdmin();
     },
 
+    togglePerishableFilter() {
+        this.filterPerishableOnly = !this.filterPerishableOnly;
+        const btn = document.getElementById('btnFilterPerishableMp');
+        if (btn) btn.classList.toggle('active', this.filterPerishableOnly);
+        this.loadInventoryAdmin();
+    },
+
+    async discardExpired(mpId) {
+        const mp = this.allRawMaterials.find(m => m.id === mpId);
+        if (!mp) return;
+        const ok = window.confirm(`Dar de baja «${mp.nombre}». El stock vencido se registra como merma y deja de usarse en cocina. ¿Continuar?`);
+        if (!ok) return;
+        try {
+            const res = await API.discardExpiredRawMaterial(mpId);
+            if (res.success) {
+                this.showAdminToast(res.message, 'success');
+                this.loadInventoryAdmin();
+                this.loadCatalogAdmin();
+            }
+        } catch (err) {
+            this.showAdminToast(`Error: ${err.message}`, 'danger');
+        }
+    },
+
     openAddRawMaterialModal() {
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addRawMaterialModal'));
         modal.show();
@@ -659,7 +708,9 @@ const Admin = {
             unidad_medida: document.getElementById('addMpUnidad').value,
             stock_actual: parseFloat(document.getElementById('addMpStock').value) || 0,
             stock_minimo: parseFloat(document.getElementById('addMpMinimo').value) || 5,
-            costo_unitario: parseFloat(document.getElementById('addMpCosto').value) || 0
+            costo_unitario: parseFloat(document.getElementById('addMpCosto').value) || 0,
+            es_perecedero: document.getElementById('addMpPerecedero')?.checked ? 1 : 0,
+            fecha_vencimiento: document.getElementById('addMpVence')?.value || null
         };
 
         try {
