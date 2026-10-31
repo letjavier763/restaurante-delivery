@@ -1,5 +1,5 @@
 // ==============================================================================
-// store.js - Lógica de Restaurante y Comida en Línea (Bistró Gourmet)
+// store.js - Lógica de Pedidos de Comida en Línea (Delivery)
 // Delivery & Pickup, Menú de Autor, KDS Tracker, Checkout PCI-DSS y Mis Pedidos
 // ==============================================================================
 
@@ -28,19 +28,45 @@ const Store = {
 
     // 1. GESTIÓN DE MODALIDAD DELIVERY / PICKUP
     loadOrderMode() {
-        const savedMode = localStorage.getItem('bistro_order_mode');
+        const savedMode = localStorage.getItem('bistro_order_mode') || localStorage.getItem('delivery_order_mode');
         if (savedMode === 'delivery' || savedMode === 'pickup') {
             this.orderMode = savedMode;
         }
-        const savedBranch = localStorage.getItem('bistro_selected_branch');
+        const savedBranch = localStorage.getItem('bistro_selected_branch') || localStorage.getItem('delivery_selected_branch');
         if (savedBranch) {
             this.selectedBranch = savedBranch;
+        }
+        const savedAddr = localStorage.getItem('delivery_address');
+        if (savedAddr) {
+            const addrEl = document.getElementById('headerDeliveryAddress');
+            if (addrEl) addrEl.textContent = savedAddr;
+            const chkAddr = document.getElementById('chkDireccion');
+            if (chkAddr) chkAddr.value = savedAddr;
         }
         this.updateModeUI();
     },
 
+    openAddressModal() {
+        const currentAddr = localStorage.getItem('delivery_address') || 'Zona 10, Ciudad de Guatemala';
+        const newAddr = prompt('Ingresa tu dirección de entrega:', currentAddr);
+        if (newAddr && newAddr.trim()) {
+            localStorage.setItem('delivery_address', newAddr.trim());
+            const addrEl = document.getElementById('headerDeliveryAddress');
+            if (addrEl) addrEl.textContent = newAddr.trim();
+            const chkAddr = document.getElementById('chkDireccion');
+            if (chkAddr) chkAddr.value = newAddr.trim();
+            this.showToastNotification('Dirección de entrega actualizada.', 'info');
+        }
+    },
+
+    handleSearchInput(val) {
+        this.searchQuery = (val || '').trim();
+        this.fetchProducts();
+    },
+
     setOrderMode(mode) {
         this.orderMode = mode;
+        localStorage.setItem('delivery_order_mode', mode);
         localStorage.setItem('bistro_order_mode', mode);
         this.updateModeUI();
         this.renderCart();
@@ -48,6 +74,7 @@ const Store = {
 
     setPickupBranch(branch) {
         this.selectedBranch = branch;
+        localStorage.setItem('delivery_selected_branch', branch);
         localStorage.setItem('bistro_selected_branch', branch);
         const heroSel = document.getElementById('heroSucursalSelect');
         if (heroSel && heroSel.value !== branch) heroSel.value = branch;
@@ -137,6 +164,20 @@ const Store = {
         if (headerTotal) {
             headerTotal.textContent = `$${subtotal.toFixed(2)}`;
         }
+
+        // Actualizar barra flotante móvil
+        const floatBar = document.getElementById('mobileFloatingCartBar');
+        if (floatBar) {
+            if (count > 0) {
+                floatBar.style.display = 'block';
+                const countEl = document.getElementById('mobileCartCount');
+                const totalEl = document.getElementById('mobileCartTotal');
+                if (countEl) countEl.textContent = `${count} ${count === 1 ? 'ítem' : 'ítems'}`;
+                if (totalEl) totalEl.textContent = `$${subtotal.toFixed(2)}`;
+            } else {
+                floatBar.style.display = 'none';
+            }
+        }
     },
 
     setTip(amount) {
@@ -184,8 +225,8 @@ const Store = {
         };
 
         let html = `
-            <button class="btn ${!this.currentCategory ? 'btn-primary' : 'btn-outline-secondary'} btn-sm rounded-pill" onclick="Store.filterCategory(null)">
-                <i class="ti ti-tools-kitchen-2 me-1"></i> Todo el Menú
+            <button class="cat-pill-btn ${!this.currentCategory ? 'active' : ''}" onclick="Store.filterCategory(null)">
+                <i class="ti ti-tools-kitchen-2"></i> <span>Todo el Menú</span>
             </button>
         `;
 
@@ -193,8 +234,8 @@ const Store = {
             const iconClass = icons[cat.slug] || 'ti-tools-kitchen';
             const isActive = this.currentCategory === cat.id;
             html += `
-                <button class="btn ${isActive ? 'btn-primary' : 'btn-outline-secondary'} btn-sm rounded-pill" onclick="Store.filterCategory(${cat.id})">
-                    <i class="ti ${iconClass} me-1"></i> ${cat.nombre}
+                <button class="cat-pill-btn ${isActive ? 'active' : ''}" onclick="Store.filterCategory(${cat.id})">
+                    <i class="ti ${iconClass}"></i> <span>${cat.nombre}</span>
                 </button>
             `;
         });
@@ -210,7 +251,7 @@ const Store = {
         const cat = this.categories.find(c => c.id === catId);
         const titleEl = document.getElementById('catalogTitle');
         if (titleEl) {
-            titleEl.textContent = cat ? cat.nombre : 'Menú Gastronómico';
+            titleEl.textContent = cat ? cat.nombre : 'Menú de Platos';
         }
     },
 
@@ -301,13 +342,13 @@ const Store = {
             const porciones = parseInt(prod.porciones_disponibles ?? prod.stock);
             const inStock = porciones > 0;
             const stockBadge = inStock 
-                ? `<span class="badge bg-green-lt"><i class="ti ti-check me-1"></i> ${porciones} porciones disponibles</span>`
+                ? `<span class="badge-portion-pill text-green"><i class="ti ti-circle-check-filled text-green"></i> ${porciones} disponibles</span>`
                 : (prod.insumos_faltantes && prod.insumos_faltantes.length 
-                    ? `<span class="badge bg-red-lt" title="Insumos faltantes: ${prod.insumos_faltantes.join(', ')}"><i class="ti ti-alert-triangle me-1"></i> Agotado (Sin insumos)</span>`
-                    : `<span class="badge bg-red-lt"><i class="ti ti-x me-1"></i> Agotado por hoy</span>`);
+                    ? `<span class="badge-portion-pill text-danger" title="Insumos faltantes: ${prod.insumos_faltantes.join(', ')}"><i class="ti ti-alert-triangle text-danger"></i> Agotado</span>`
+                    : `<span class="badge-portion-pill text-danger"><i class="ti ti-ban text-danger"></i> Agotado</span>`);
 
             const ribbonHtml = prod.destacado == 1 
-                ? `<div class="ribbon bg-red text-white"><i class="ti ti-star me-1"></i> Recomendación Chef</div>` 
+                ? `<div class="ribbon bg-primary text-white fw-bold shadow-xs"><i class="ti ti-star me-1"></i> Favorito</div>` 
                 : '';
 
             // Parse specs
@@ -322,11 +363,14 @@ const Store = {
                 }
             }
 
+            const inCartItem = this.cart.find(it => it.id === prod.id);
+            const cartQty = inCartItem ? inCartItem.cantidad : 0;
+
             return `
                 <div class="col-sm-6 col-lg-4 col-xl-3">
-                    <div class="card card-tech h-100 ${!inStock ? 'opacity-75' : ''}">
+                    <div class="card-dish-modern h-100 ${!inStock ? 'opacity-75' : ''}">
                         ${ribbonHtml}
-                        <div class="product-img-wrapper" onclick="Store.openQuickView(${prod.id})" style="cursor: pointer;">
+                        <div class="dish-media" onclick="Store.openQuickView(${prod.id})" style="cursor: pointer;" title="Ver detalle del plato">
                             <img src="${prod.imagen_url}" alt="${prod.nombre}" loading="lazy"/>
                             <div class="position-absolute top-0 start-0 m-2">
                                 <span class="badge-prep"><i class="ti ti-clock text-primary"></i> ${prepTime}</span>
@@ -334,42 +378,47 @@ const Store = {
                             <div class="position-absolute bottom-0 end-0 m-2">
                                 ${stockBadge}
                             </div>
+                            ${cartQty > 0 ? `
+                                <div class="position-absolute bottom-0 start-0 m-2">
+                                    <span class="badge bg-primary text-white rounded-pill px-2 py-1 shadow-sm"><i class="ti ti-check me-1"></i>${cartQty} en tu orden</span>
+                                </div>
+                            ` : ''}
                         </div>
                         <div class="card-body d-flex flex-column p-3">
                             <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="badge bg-light text-primary text-uppercase" style="font-size: 0.65rem;">${prod.categoria_nombre}</span>
-                                ${calories ? `<span class="badge bg-light text-muted" style="font-size: 0.65rem;"><i class="ti ti-flame me-1 text-danger"></i>${calories}</span>` : ''}
+                                <span class="badge bg-light text-primary text-uppercase fw-bold" style="font-size: 0.68rem;">${prod.categoria_nombre}</span>
+                                ${calories ? `<span class="badge bg-light text-muted" style="font-size: 0.68rem;"><i class="ti ti-flame me-1 text-danger"></i>${calories}</span>` : ''}
                             </div>
-                            <h3 class="card-title text-dark mb-1" style="font-size: 1.05rem; line-height: 1.35; font-family: 'Playfair Display', serif; cursor: pointer;" onclick="Store.openQuickView(${prod.id})">
+                            <h3 class="card-title text-dark mb-1 fw-bold text-truncate" style="font-size: 1.05rem; cursor: pointer;" onclick="Store.openQuickView(${prod.id})" title="${prod.nombre}">
                                 ${prod.nombre}
                             </h3>
-                            <p class="text-secondary small mb-2 text-truncate-2" style="min-height: 38px;">
+                            <p class="text-secondary small mb-2 text-truncate-2" style="min-height: 38px; line-height: 1.4;">
                                 ${prod.descripcion}
                             </p>
                             ${ingredientsShort ? `
-                                <div class="text-muted small mb-3 fst-italic" style="font-size: 0.72rem;">
+                                <div class="text-muted small mb-3 text-truncate" style="font-size: 0.72rem;">
                                     <i class="ti ti-tools-kitchen me-1 text-secondary"></i> ${ingredientsShort}...
                                 </div>
                             ` : '<div class="mb-3"></div>'}
                             <div class="mt-auto pt-2 border-top d-flex justify-content-between align-items-center">
                                 <div>
-                                    <div class="text-muted" style="font-size: 0.65rem;">PRECIO CULINARIO</div>
-                                    <div class="h2 mb-0 font-monospace text-dark">$${parseFloat(prod.precio).toFixed(2)}</div>
+                                    <div class="text-muted small fw-bold" style="font-size: 0.65rem;">PRECIO</div>
+                                    <div class="h2 mb-0 font-monospace text-dark fw-bold">$${parseFloat(prod.precio).toFixed(2)}</div>
                                 </div>
                                 <div class="d-flex gap-1">
                                     <button 
-                                        class="btn btn-outline-secondary btn-sm p-1 px-2"
+                                        class="btn btn-outline-secondary btn-sm p-1 px-2 rounded-circle"
                                         title="Ver detalles"
                                         onclick="Store.openQuickView(${prod.id})"
                                     >
                                         <i class="ti ti-eye"></i>
                                     </button>
                                     <button 
-                                        class="btn ${inStock ? 'btn-primary' : 'btn-secondary'} btn-sm d-inline-flex align-items-center"
+                                        class="btn ${inStock ? 'btn-primary' : 'btn-secondary'} btn-sm d-inline-flex align-items-center rounded-pill px-3 fw-bold shadow-xs"
                                         onclick="Store.addToCart(${prod.id})" 
                                         ${!inStock ? 'disabled' : ''}
                                     >
-                                        <i class="ti ${inStock ? 'ti-shopping-bag-plus' : 'ti-ban'} me-1"></i> ${inStock ? 'Añadir' : 'Agotado'}
+                                        <i class="ti ${inStock ? 'ti-plus' : 'ti-ban'} me-1"></i> ${inStock ? 'Añadir' : 'Agotado'}
                                     </button>
                                 </div>
                             </div>

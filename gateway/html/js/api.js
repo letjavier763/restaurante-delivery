@@ -1,6 +1,6 @@
 // ==============================================================================
 // api.js - Cliente API Unificado para Gateway y Microservicios
-// Bistró Gourmet - Restaurante, Delivery & Pickup
+// Delivery - Restaurante, Delivery Express & Pickup
 // Zero Trust: Inyección de Bearer JWT en todas las peticiones autenticadas
 // ==============================================================================
 
