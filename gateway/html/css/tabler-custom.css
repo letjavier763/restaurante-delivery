@@ -293,8 +293,41 @@ pre {
     50%       { opacity: 0.6; }
 }
 
-/* ── SUB-TABS OVERFLOW SCROLL ────────────────────────────────── */
-#adminTabs::-webkit-scrollbar { height: 0; }
+/* ── SUB-TABS OVERFLOW SCROLL MODERNO ────────────────────────── */
+#adminTabs {
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+}
+
+#adminTabs::-webkit-scrollbar {
+    height: 4px;
+}
+
+#adminTabs::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+#adminTabs::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+#adminTabs::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+#adminTabs .nav-link {
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 0.65rem 1rem;
+    transition: all 0.2s ease;
+}
+
+#adminTabs .nav-link.active {
+    color: #e11d48 !important;
+    border-bottom: 3px solid #e11d48 !important;
+    background: transparent !important;
+}
 
 /* ── RESTAURANT DELIVERY / PICKUP SWITCHER ──────────────────── */
 .mode-switcher-container {

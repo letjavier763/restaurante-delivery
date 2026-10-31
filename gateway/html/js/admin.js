@@ -247,6 +247,15 @@ const Admin = {
                 if (kpiLogsBadge) kpiLogsBadge.textContent = `${total} eventos`;
             }
 
+            // Insumos y materias primas
+            API.getRawMaterials().then(res => {
+                if (res.success && res.data) {
+                    this.allRawMaterials = res.data;
+                    const navBadge = document.getElementById('navMpBadge');
+                    if (navBadge) navBadge.textContent = `${res.data.length} Insumos`;
+                }
+            }).catch(() => {});
+
         } catch (e) {
             console.error('[DASHBOARD] Error cargando datos:', e);
         }
@@ -1270,7 +1279,11 @@ const Admin = {
         document.getElementById('editProductId').value = id;
         document.getElementById('editProductNombre').value = prod.nombre;
         document.getElementById('editProductPrecio').value = prod.precio;
-        document.getElementById('editProductStock').value = prod.stock;
+        const porciones = prod.porciones_disponibles ?? prod.stock ?? 0;
+        const stockBadge = document.getElementById('editProductStockBadge');
+        if (stockBadge) stockBadge.textContent = `${porciones} porciones disponibles`;
+        const stockInput = document.getElementById('editProductStock');
+        if (stockInput) stockInput.value = porciones;
         document.getElementById('editProductDescripcion').value = prod.descripcion;
         document.getElementById('editProductImagen').value = prod.imagen_url;
         document.getElementById('editProductDestacado').checked = prod.destacado == 1;

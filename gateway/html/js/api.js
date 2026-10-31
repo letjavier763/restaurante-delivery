@@ -356,11 +356,8 @@ const API = {
     // 6. UTILIDADES
     // ============================================================
     formatCurrency(amount) {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 2
-        }).format(parseFloat(amount) || 0);
+        const val = parseFloat(amount) || 0;
+        return `Q${val.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     },
 
     formatDate(dateStr) {

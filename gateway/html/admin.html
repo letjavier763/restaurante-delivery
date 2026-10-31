@@ -74,25 +74,26 @@
             <div class="collapse navbar-collapse" id="navbar-sub">
                 <div class="navbar navbar-light">
                     <div class="container-xl">
-                        <ul class="nav nav-tabs card-header-tabs border-0 flex-nowrap overflow-auto" id="adminTabs" style="scrollbar-width: none;">
+                        <ul class="nav nav-tabs card-header-tabs border-0 flex-nowrap overflow-auto" id="adminTabs">
                             <li class="nav-item">
                                 <a href="#tab-overview" class="nav-link active" onclick="Admin.switchTab('tab-overview')">
                                     <i class="ti ti-layout-dashboard me-2 text-primary"></i> Resumen &amp; KPIs
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a href="#tab-products" class="nav-link" onclick="Admin.switchTab('tab-products')">
-                                    <i class="ti ti-tools-kitchen-2 me-2 text-red"></i> Platillos &amp; Menú
+                                <a href="#tab-inventory" class="nav-link" onclick="Admin.switchTab('tab-inventory')">
+                                    <i class="ti ti-box-seam me-2 text-green"></i> Inventario de Ingredientes &amp; Insumos
+                                    <span class="badge bg-green-lt text-green ms-1 font-monospace" id="navMpBadge">Bodega</span>
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a href="#tab-inventory" class="nav-link" onclick="Admin.switchTab('tab-inventory')">
-                                    <i class="ti ti-packages me-2 text-green"></i> Módulo de Stock &amp; Bodega
+                                <a href="#tab-products" class="nav-link" onclick="Admin.switchTab('tab-products')">
+                                    <i class="ti ti-tools-kitchen-2 me-2 text-red"></i> Menú de Platillos (Porciones BOM)
                                 </a>
                             </li>
                             <li class="nav-item">
                                 <a href="#tab-catalog" class="nav-link" onclick="Admin.switchTab('tab-catalog')">
-                                    <i class="ti ti-receipt-2 me-2 text-cyan"></i> Escandallo &amp; Porciones
+                                    <i class="ti ti-receipt-2 me-2 text-cyan"></i> Escandallo &amp; Fichas Técnicas
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -148,7 +149,7 @@
                                             <div class="spinner-border spinner-border-sm text-muted"></div>
                                         </div>
                                         <div class="d-flex align-items-center">
-                                            <span class="avatar avatar-xs bg-green-lt rounded me-2"><i class="ti ti-currency-dollar"></i></span>
+                                            <span class="avatar avatar-xs bg-green-lt rounded me-2 fw-bold text-green">Q</span>
                                             <span class="text-secondary small">Stripe Sandbox Payments</span>
                                         </div>
                                     </div>
@@ -995,15 +996,20 @@
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label required" for="addProdTipo">Tipo de Producto</label>
-                                    <select id="addProdTipo" class="form-select" onchange="Admin.toggleNewProductType(this.value)">
-                                        <option value="receta" selected>Platillo de Cocina (Preparado con Receta BOM)</option>
-                                        <option value="directo">Artículo Directo (Sin receta, ej. Bebida/Vino embotellado)</option>
-                                    </select>
+                                    <label class="form-label text-muted">Stock del Platillo</label>
+                                    <div class="p-2 bg-light rounded border text-center">
+                                        <span class="badge bg-purple text-white fw-bold fs-4" id="addProdStockPreviewBadge">Dinámico por Insumos</span>
+                                    </div>
+                                    <input type="hidden" id="addProdStock" value="0"/>
+                                    <input type="hidden" id="addProdTipo" value="receta"/>
                                 </div>
-                                <div class="col-md-4" id="addProdStockDirectoContainer" style="display: none;">
-                                    <label class="form-label required" for="addProdStock">Stock Físico Inicial</label>
-                                    <input type="number" min="0" id="addProdStock" class="form-control" value="0" placeholder="0"/>
+                                <div class="col-12">
+                                    <div class="alert alert-info py-2 px-3 small mb-0 d-flex align-items-center gap-2">
+                                        <i class="ti ti-info-circle fs-2 text-primary"></i>
+                                        <div>
+                                            <strong>Control de Stock por Insumos:</strong> No se ingresa un stock fijo para los platillos. El sistema calcula en tiempo real cuántas porciones pueden servirse en base a las existencias de sus ingredientes en bodega.
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-md-8">
                                     <label class="form-label" for="addProdImagen">URL de Imagen</label>
@@ -1113,8 +1119,12 @@
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label required" for="editProductStock">Stock</label>
-                            <input type="number" min="0" id="editProductStock" class="form-control" required/>
+                            <label class="form-label text-muted">Stock / Porciones Disponibles</label>
+                            <div class="p-2 bg-light rounded border text-center">
+                                <span class="badge bg-green-lt fw-bold fs-4" id="editProductStockBadge">0 porciones</span>
+                                <input type="hidden" id="editProductStock" value="0"/>
+                            </div>
+                            <small class="text-muted d-block mt-1 text-center" style="font-size: 0.7rem;">Calculado automáticamente por insumos en bodega</small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-check form-switch mt-4">

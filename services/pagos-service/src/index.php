@@ -126,7 +126,7 @@ try {
             $pedidoId,
             null,
             null,
-            ['monto' => (float)$pedido['total'], 'moneda' => 'USD', 'payment_intent_id' => $paymentIntentId],
+            ['monto' => (float)$pedido['total'], 'moneda' => 'GTQ', 'payment_intent_id' => $paymentIntentId],
             'EXITO'
         );
 
@@ -136,7 +136,7 @@ try {
             'payment_intent_id' => $paymentIntentId,
             'client_secret'     => $clientSecret,
             'monto'             => (float)$pedido['total'],
-            'moneda'            => 'USD',
+            'moneda'            => 'GTQ',
             'stripe_public_key' => $_ENV['STRIPE_PUBLIC_KEY'] ?? 'pk_test_demo'
         ]);
     }
@@ -195,7 +195,7 @@ try {
         $monto = (float)$pedido['total'];
         $insPago = $db->prepare("
             INSERT INTO pagos (id_pedido, monto, moneda, metodo, payment_intent_id, stripe_status, cliente_email, metadata_segura, fecha_pago)
-            VALUES (:pid, :monto, 'USD', 'stripe', :intent, 'succeeded', :email, :meta, NOW())
+            VALUES (:pid, :monto, 'GTQ', 'stripe', :intent, 'succeeded', :email, :meta, NOW())
         ");
         $metadataSegura = json_encode([
             'processor' => 'Stripe Payments',

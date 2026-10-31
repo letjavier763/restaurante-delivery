@@ -136,8 +136,8 @@ try {
         }
 
         $impuesto = round($subtotal * 0.12, 2); // 12% IVA
-        // REGLA DE DELIVERY / PICKUP: Pickup siempre es $0.00. Delivery es gratis arriba de $25.00, sino $2.50.
-        $envio = ($tipoEntrega === 'pickup') ? 0.00 : (($subtotal >= 25.00) ? 0.00 : 2.50);
+        // REGLA DE DELIVERY / PICKUP: Pickup siempre es Q0.00. Delivery es gratis arriba de Q150.00, sino Q15.00.
+        $envio = ($tipoEntrega === 'pickup') ? 0.00 : (($subtotal >= 150.00) ? 0.00 : 15.00);
         $total = round($subtotal + $impuesto + $envio + $propina, 2);
 
         $uuid = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
@@ -430,7 +430,7 @@ try {
             header('Content-Type: text/csv; charset=utf-8');
             header('Content-Disposition: attachment; filename="reporte_pedidos_' . date('Ymd_His') . '.csv"');
             $output = fopen('php://output', 'w');
-            fputcsv($output, ['ID', 'No. Pedido', 'Cliente', 'Email', 'Total (USD)', 'Estado', 'Fecha']);
+            fputcsv($output, ['ID', 'No. Pedido', 'Cliente', 'Email', 'Total (GTQ)', 'Estado', 'Fecha']);
             foreach ($exportData as $row) {
                 fputcsv($output, $row);
             }
