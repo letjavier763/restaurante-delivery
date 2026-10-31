@@ -188,6 +188,71 @@ const API = {
     },
 
     // ============================================================
+    // 2.1 INVENTARIO DE MATERIAS PRIMAS & RECETAS (BOM)
+    // ============================================================
+    async getRawMaterials(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        return this.request(`/api/catalogo/materias-primas${query ? '?' + query : ''}`);
+    },
+
+    async getRawMaterial(id) {
+        return this.request(`/api/catalogo/materias-primas/${id}`);
+    },
+
+    async addRawMaterial(data) {
+        return this.request('/api/catalogo/materias-primas', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+
+    async updateRawMaterial(id, data) {
+        return this.request(`/api/catalogo/materias-primas/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+
+    async addRawMaterialMovement(id, data) {
+        return this.request(`/api/catalogo/materias-primas/${id}/movimiento`, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+
+    async getRawMaterialKardex(id, limit = 50) {
+        return this.request(`/api/catalogo/materias-primas/${id}/kardex?limit=${limit}`);
+    },
+
+    async getInventoryMovements(params = {}) {
+        const query = new URLSearchParams(params).toString();
+        return this.request(`/api/catalogo/movimientos-inventario${query ? '?' + query : ''}`);
+    },
+
+    async getProductRecipe(id) {
+        return this.request(`/api/catalogo/productos/${id}/receta`);
+    },
+
+    async saveRecipeIngredient(productId, data) {
+        return this.request(`/api/catalogo/productos/${productId}/receta`, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+
+    async deleteRecipeIngredient(productId, materiaId) {
+        return this.request(`/api/catalogo/productos/${productId}/receta/${materiaId}`, {
+            method: 'DELETE'
+        });
+    },
+
+    async syncAllStock() {
+        return this.request('/api/catalogo/recetas/sincronizar', {
+            method: 'POST'
+        });
+    },
+
+    // ============================================================
     // 3. PEDIDOS SERVICE
     // ============================================================
     async createOrder(items, direccion, telefono, notas = '', tipoEntrega = 'delivery', sucursal = '', propina = 0) {

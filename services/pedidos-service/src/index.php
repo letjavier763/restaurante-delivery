@@ -8,6 +8,8 @@ require_once __DIR__ . '/../../common/Database.php';
 require_once __DIR__ . '/../../common/JWT.php';
 require_once __DIR__ . '/../../common/Security.php';
 require_once __DIR__ . '/../../common/AuditClient.php';
+require_once __DIR__ . '/../../common/UnitConverter.php';
+require_once __DIR__ . '/../../common/InventoryManager.php';
 
 Security::applySecurityHeaders();
 
@@ -75,9 +77,32 @@ try {
             $clienteId = (int)$cliente['id'];
         }
 
-        // CONTRALORÍA DE PRECIOS EN SERVIDOR (STRIDE Tampering - Sección 5):
-        // NUNCA confiar en precios enviados por el cliente. Consultar siempre catalogo_db directamente.
+        // CONTRALORÍA DE PRECIOS E INVENTARIO EN SERVIDOR (STRIDE Tampering & BOM Gastronómico):
+        // NUNCA confiar en precios ni stock enviados por el cliente. Consultar siempre catalogo_db directamente.
         $catDb = Database::getMasterConnection($_ENV['DB_CATALOGO_NAME'] ?? 'catalogo_db');
+
+        // VALIDACIÓN PREVIA DE MATERIAS PRIMAS / RECETAS / STOCK PARA TODA LA ORDEN
+        $valInv = InventoryManager::validateOrderInventory($catDb, $items);
+        if (!$valInv['valid']) {
+            AuditClient::log(
+                'VENTA_BLOQUEADA_STOCK_INSUFICIENTE',
+                'pedidos-service',
+                (int)$user['id'],
+                $user['email'],
+                $user['rol'] ?? 'cliente',
+                null,
+                null,
+                null,
+                ['error' => $valInv['error'], 'insumo' => $valInv['insumo_insuficiente'] ?? null],
+                'FALLO'
+            );
+            Security::jsonResponse([
+                'success' => false,
+                'error' => $valInv['error'],
+                'insumo_insuficiente' => $valInv['insumo_insuficiente'] ?? null
+            ], 400);
+        }
+
         $subtotal = 0.00;
         $itemsProcesados = [];
 
@@ -92,10 +117,6 @@ try {
 
             if (!$producto || (int)$producto['activo'] !== 1) {
                 Security::jsonResponse(['success' => false, 'error' => "El platillo ID {$prodId} no está disponible"], 400);
-            }
-
-            if ((int)$producto['stock'] < $cantidad) {
-                Security::jsonResponse(['success' => false, 'error' => "Porciones insuficientes para '{$producto['nombre']}'. Disponible hoy: {$producto['stock']}"], 400);
             }
 
             $precioUnitario = (float)$producto['precio'];
@@ -126,7 +147,7 @@ try {
         );
         $numeroPedido = 'ORD-' . date('Y') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
 
-        // Transacción para insertar pedido y detalles
+        // Transacción para insertar pedido, detalles y descontar insumos del inventario
         $db->beginTransaction();
         try {
             $pedStmt = $db->prepare("
@@ -165,28 +186,17 @@ try {
                     ':sub'  => $it['subtotal'],
                     ':not'  => $it['notas'] ?: null,
                 ]);
-
-                // Descontar inventario
-                $upStock = $catDb->prepare("UPDATE productos SET stock = stock - :cant WHERE id = :id");
-                $upStock->execute([':cant' => $it['cantidad'], ':id' => $it['id_producto']]);
-
-                // Verificar si se agotó
-                $nuevoStock = $it['stock_actual'] - $it['cantidad'];
-                if ($nuevoStock <= 0) {
-                    AuditClient::log(
-                        'PRODUCTO_AGOTADO',
-                        'catalogo-service',
-                        null,
-                        'sistema@technova.internal',
-                        'servicio',
-                        $pedidoId,
-                        null,
-                        ['producto_id' => $it['id_producto'], 'stock_previo' => $it['stock_actual']],
-                        ['producto_id' => $it['id_producto'], 'stock_actual' => $nuevoStock],
-                        'EXITO'
-                    );
-                }
             }
+
+            // DESCUENTO ATÓMICO DE MATERIAS PRIMAS (g, lb, ml, l, unid) CON HISTORIAL KARDEX
+            $deduction = InventoryManager::deductOrderInventory(
+                $catDb,
+                $items,
+                $numeroPedido,
+                $pedidoId,
+                (int)$user['id'],
+                $user['email']
+            );
 
             $db->commit();
         } catch (Throwable $e) {
@@ -343,6 +353,23 @@ try {
         $estadoAnterior = $ped['estado'];
         $upStmt = $db->prepare("UPDATE pedidos SET estado = :est WHERE id = :id");
         $upStmt->execute([':est' => $nuevoEstado, ':id' => $pedidoId]);
+
+        // REINFORZAMIENTO DE INVENTARIO: Si se cancela la orden, reintegrar las materias primas al inventario
+        if ($nuevoEstado === 'cancelado' && $estadoAnterior !== 'cancelado') {
+            try {
+                $catDb = Database::getMasterConnection($_ENV['DB_CATALOGO_NAME'] ?? 'catalogo_db');
+                InventoryManager::revertOrderInventory(
+                    $catDb,
+                    $pedidoId,
+                    $ped['numero_pedido'],
+                    (int)$user['id'],
+                    $user['email'],
+                    'Pedido cancelado desde monitor de cocina / administración'
+                );
+            } catch (Throwable $e) {
+                error_log("[REVERT INVENTORY EXCEPTION] " . $e->getMessage());
+            }
+        }
 
         // REGISTRAR EVENTO AUDITORÍA: PEDIDO_ESTADO_CAMBIADO
         AuditClient::log(

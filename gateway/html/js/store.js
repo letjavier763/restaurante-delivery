@@ -298,10 +298,13 @@ const Store = {
         }
 
         grid.innerHTML = filtered.map(prod => {
-            const inStock = parseInt(prod.stock) > 0;
+            const porciones = parseInt(prod.porciones_disponibles ?? prod.stock);
+            const inStock = porciones > 0;
             const stockBadge = inStock 
-                ? `<span class="badge bg-green-lt"><i class="ti ti-check me-1"></i> ${prod.stock} porciones hoy</span>`
-                : `<span class="badge bg-red-lt"><i class="ti ti-x me-1"></i> Agotado por hoy</span>`;
+                ? `<span class="badge bg-green-lt"><i class="ti ti-check me-1"></i> ${porciones} porciones disponibles</span>`
+                : (prod.insumos_faltantes && prod.insumos_faltantes.length 
+                    ? `<span class="badge bg-red-lt" title="Insumos faltantes: ${prod.insumos_faltantes.join(', ')}"><i class="ti ti-alert-triangle me-1"></i> Agotado (Sin insumos)</span>`
+                    : `<span class="badge bg-red-lt"><i class="ti ti-x me-1"></i> Agotado por hoy</span>`);
 
             const ribbonHtml = prod.destacado == 1 
                 ? `<div class="ribbon bg-red text-white"><i class="ti ti-star me-1"></i> Recomendación Chef</div>` 
@@ -321,7 +324,7 @@ const Store = {
 
             return `
                 <div class="col-sm-6 col-lg-4 col-xl-3">
-                    <div class="card card-tech h-100">
+                    <div class="card card-tech h-100 ${!inStock ? 'opacity-75' : ''}">
                         ${ribbonHtml}
                         <div class="product-img-wrapper" onclick="Store.openQuickView(${prod.id})" style="cursor: pointer;">
                             <img src="${prod.imagen_url}" alt="${prod.nombre}" loading="lazy"/>
@@ -366,7 +369,7 @@ const Store = {
                                         onclick="Store.addToCart(${prod.id})" 
                                         ${!inStock ? 'disabled' : ''}
                                     >
-                                        <i class="ti ti-shopping-bag-plus me-1"></i> ${inStock ? 'Añadir' : 'Agotado'}
+                                        <i class="ti ${inStock ? 'ti-shopping-bag-plus' : 'ti-ban'} me-1"></i> ${inStock ? 'Añadir' : 'Agotado'}
                                     </button>
                                 </div>
                             </div>
@@ -379,10 +382,20 @@ const Store = {
 
     addToCart(prodId, note = '') {
         const prod = this.products.find(p => p.id === prodId);
-        if (!prod || parseInt(prod.stock) <= 0) return;
+        if (!prod) return;
+
+        const availableStock = parseInt(prod.porciones_disponibles ?? prod.stock);
+        if (availableStock <= 0) {
+            this.showToastNotification(`Lo sentimos, "${prod.nombre}" no está disponible por falta de insumos en cocina.`, 'danger');
+            return;
+        }
 
         const existing = this.cart.find(item => item.id === prodId);
         if (existing) {
+            if (existing.cantidad + 1 > availableStock) {
+                this.showToastNotification(`Solo hay ${availableStock} porciones disponibles de "${prod.nombre}" hoy.`, 'warning');
+                return;
+            }
             existing.cantidad += 1;
             if (note) existing.nota = note;
         } else {
@@ -401,19 +414,29 @@ const Store = {
         this.showToastNotification(`¡"${prod.nombre}" añadido a tu orden!`);
     },
 
-    showToastNotification(msg) {
-        // Notification pill
+    showToastNotification(msg, tipo = 'success') {
         const toast = document.createElement('div');
-        toast.className = 'position-fixed bottom-0 end-0 m-3 p-3 bg-white border border-primary rounded shadow-lg d-flex align-items-center gap-2';
+        const borderColor = tipo === 'danger' ? 'border-danger' : (tipo === 'warning' ? 'border-warning' : 'border-primary');
+        const iconColor = tipo === 'danger' ? 'text-danger ti-circle-x' : (tipo === 'warning' ? 'text-warning ti-alert-triangle' : 'text-green ti-circle-check');
+        toast.className = `position-fixed bottom-0 end-0 m-3 p-3 bg-white border ${borderColor} rounded shadow-lg d-flex align-items-center gap-2`;
         toast.style.zIndex = '9999';
-        toast.innerHTML = `<i class="ti ti-circle-check fs-2 text-green"></i> <span class="small fw-bold text-dark">${msg}</span>`;
+        toast.innerHTML = `<i class="ti ${iconColor} fs-2"></i> <span class="small fw-bold text-dark">${msg}</span>`;
         document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 2500);
+        setTimeout(() => toast.remove(), 3000);
     },
 
     changeCartQuantity(prodId, delta) {
         const item = this.cart.find(it => it.id === prodId);
         if (!item) return;
+
+        if (delta > 0) {
+            const prod = this.products.find(p => p.id === prodId);
+            const availableStock = prod ? parseInt(prod.porciones_disponibles ?? prod.stock) : 999;
+            if (item.cantidad + delta > availableStock) {
+                this.showToastNotification(`Solo hay ${availableStock} porciones preparables de este platillo hoy.`, 'warning');
+                return;
+            }
+        }
 
         item.cantidad += delta;
         if (item.cantidad <= 0) {
@@ -643,7 +666,8 @@ const Store = {
             succModal.show();
 
         } catch (err) {
-            alert('Atención en el Checkout: ' + err.message);
+            alert('Atención en el Checkout:\n\n' + err.message);
+            this.fetchProducts(); // Actualiza disponibilidad en vivo
         } finally {
             if (btn) {
                 btn.disabled = false;
@@ -774,14 +798,42 @@ const Store = {
         }
         if (qvCategory) qvCategory.textContent = prod.categoria_nombre || 'Especialidad';
 
+        const porciones = parseInt(prod.porciones_disponibles ?? prod.stock);
+        const inStock = porciones > 0;
+
         let prepTime = '15-20 min';
         let specsHtml = '';
+
+        if (!inStock) {
+            const faltantes = (prod.insumos_faltantes && prod.insumos_faltantes.length) 
+                ? prod.insumos_faltantes.join(', ') 
+                : 'Materia prima no disponible';
+            specsHtml += `
+                <div class="alert alert-danger py-2 px-3 small d-flex align-items-center mb-2">
+                    <i class="ti ti-alert-triangle me-2 fs-2"></i>
+                    <div>
+                        <strong>Platillo no disponible:</strong> No contamos con ingredientes o stock suficiente en cocina para prepararlo hoy.
+                        <div class="text-muted mt-1 small">Insumo agotado: <strong>${faltantes}</strong></div>
+                    </div>
+                </div>
+            `;
+        } else {
+            specsHtml += `
+                <div class="alert alert-success py-2 px-3 small d-flex align-items-center mb-2">
+                    <i class="ti ti-circle-check me-2 fs-2 text-green"></i>
+                    <div>
+                        <strong>Disponible en cocina:</strong> Contamos con insumos para preparar <strong>${porciones} porciones</strong> frescas hoy.
+                    </div>
+                </div>
+            `;
+        }
+
         if (prod.especificaciones && typeof prod.especificaciones === 'object') {
             prepTime = prod.especificaciones.tiempo_preparacion || prepTime;
             const alergenos = prod.especificaciones.alergenos || [];
             const ingredientes = prod.especificaciones.ingredientes || [];
 
-            specsHtml = `
+            specsHtml += `
                 <div class="p-2 bg-light rounded small mb-2 border">
                     <div class="mb-1"><strong><i class="ti ti-flame text-danger me-1"></i>Calorías:</strong> ${prod.especificaciones.calorias || 'Aprox 550 kcal'}</div>
                     <div class="mb-1"><strong><i class="ti ti-users text-primary me-1"></i>Porción:</strong> ${prod.especificaciones.porciones || '1 persona'}</div>
@@ -797,11 +849,20 @@ const Store = {
         if (qvSpecs) qvSpecs.innerHTML = specsHtml;
 
         if (qvAddBtn) {
-            qvAddBtn.onclick = () => {
-                const note = document.getElementById('qvItemNote')?.value || '';
-                Store.addToCart(prod.id, note);
-                bootstrap.Modal.getInstance(document.getElementById('quickViewModal'))?.hide();
-            };
+            if (inStock) {
+                qvAddBtn.disabled = false;
+                qvAddBtn.className = 'btn btn-primary';
+                qvAddBtn.innerHTML = '<i class="ti ti-shopping-bag-plus me-1"></i> Añadir a mi Orden';
+                qvAddBtn.onclick = () => {
+                    const note = document.getElementById('qvItemNote')?.value || '';
+                    Store.addToCart(prod.id, note);
+                    bootstrap.Modal.getInstance(document.getElementById('quickViewModal'))?.hide();
+                };
+            } else {
+                qvAddBtn.disabled = true;
+                qvAddBtn.className = 'btn btn-secondary';
+                qvAddBtn.innerHTML = '<i class="ti ti-ban me-1"></i> Agotado por hoy';
+            }
         }
 
         const modal = new bootstrap.Modal(document.getElementById('quickViewModal'));

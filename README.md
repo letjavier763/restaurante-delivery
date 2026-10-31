@@ -103,6 +103,30 @@ La plataforma incorpora lógica especializada para pedidos gastronómicos en lí
 
 ---
 
+## 4.1. Módulo Culinario: Inventario, Materia Prima & Escandallo de Recetas (BOM)
+
+El sistema incorpora un motor integral de inventario gastronómico y contraloría de costos:
+1. **Inventario de Materias Primas con Unidades Reales:**
+   - Medición precisa en **gramos (`g`)**, **kilogramos (`kg`)**, **libras (`lb`)**, **onzas (`oz`)**, **mililitros (`ml`)**, **litros (`l`)** y **unidades (`unid`)**.
+   - Módulo [`UnitConverter`](file:///home/ltj763/proyectos/e-comerce/services/common/UnitConverter.php) con conversión dimensional automática entre familias de masa y volumen.
+   - Puntos de reorden y alertas automáticas de stock bajo (`stock_minimo`).
+2. **Escandallo de Recetas (BOM — Bill of Materials):**
+   - Cada comida/platillo se compone de su ficha técnica de ingredientes requeridos por porción.
+   - Cálculo dinámico de porciones disponibles en tiempo real:
+     $$\text{Porciones Preparables} = \min_{i \in \text{críticos}} \left\lfloor \frac{\text{Stock Actual}_i}{\text{Cantidad Necesaria}_i} \right\rfloor$$
+   - Costeo automático por porción y cálculo del margen de ganancia bruto ($ y %).
+3. **Control Estricto de Disponibilidad & Bloqueo de Ventas:**
+   - Si un ingrediente crítico se agota o es insuficiente, la plataforma **bloquea la venta automáticamente**:
+     - En el frontend del cliente ([`store.js`](file:///home/ltj763/proyectos/e-comerce/gateway/html/js/store.js)), el platillo se marca como **"Agotado (Sin insumos)"** y el botón de orden se deshabilita.
+     - En el backend ([`pedidos-service`](file:///home/ltj763/proyectos/e-comerce/services/pedidos-service/src/index.php)), se valida el pedido consolidado contra bodega; si hay déficit, rechaza la transacción con HTTP 400 detallando el insumo faltante y registra el evento `VENTA_BLOQUEADA_STOCK_INSUFICIENTE` en auditoría.
+4. **Deducción Atómica y Trazabilidad Kardex:**
+   - Cada orden confirmada descuenta con exactitud los insumos en `g`, `lb`, `ml`, etc., registrando el movimiento en `movimientos_inventario` asociado al número de orden.
+   - Si una orden es cancelada en cocina, el sistema ejecuta [`revertOrderInventory`](file:///home/ltj763/proyectos/e-comerce/services/common/InventoryManager.php) para restituir los insumos al inventario y registrar la devolución en Kardex.
+5. **Consola de Administración de Bodega:**
+   - Pestaña **"Materias Primas & Insumos"** y modal **"Ficha Técnica / Receta"** en [`admin.html`](file:///home/ltj763/proyectos/e-comerce/gateway/html/admin.html) para compras, mermas, ajustes de inventario y edición de recetas.
+
+---
+
 ## 5. Guía Rápida de Despliegue y Ejecución
 
 ### Requisitos Previos:

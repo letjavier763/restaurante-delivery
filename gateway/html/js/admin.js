@@ -9,6 +9,9 @@ const Admin = {
     chartPagos: null,
     currentTab: 'tab-overview',
     allProducts: [],
+    allRawMaterials: [],
+    filterLowStockOnly: false,
+    currentRecipeData: null,
     allUsers: [],
     allOrders: [],
 
@@ -153,12 +156,24 @@ const Admin = {
         const link = document.querySelector(`#adminTabs a[href="#${tabId}"]`);
         if (link) link.classList.add('active');
 
+        if (this.kdsInterval) {
+            clearInterval(this.kdsInterval);
+            this.kdsInterval = null;
+        }
+
         // Cargar datos según tab activo
         switch(tabId) {
             case 'tab-overview':   this.loadDashboard(); break;
+            case 'tab-inventory':  this.loadInventoryAdmin(); break;
             case 'tab-catalog':    this.loadCatalogAdmin(); break;
             case 'tab-products':   this.loadProductsCrud(); break;
-            case 'tab-orders':     this.loadOrdersAdmin(); break;
+            case 'tab-orders':     
+                this.loadOrdersAdmin(); 
+                // Auto-refresco en vivo para pantalla de cocina (cada 7 segundos)
+                this.kdsInterval = setInterval(() => {
+                    if (this.currentTab === 'tab-orders') this.loadOrdersAdmin(true);
+                }, 7000);
+                break;
             case 'tab-users':      this.loadUsersAdmin(); break;
             case 'tab-audit':      this.loadAuditLogs(); break;
             case 'tab-pci':        /* nada */ break;
@@ -375,19 +390,25 @@ const Admin = {
     },
 
     // ============================================================
-    // 2. GESTIÓN DE PRECIOS (Tab: tab-catalog)
+    // 2. ESCANDALLO DE RECETAS & PRECIOS (Tab: tab-catalog)
     // ============================================================
     async loadCatalogAdmin() {
         const tbody = document.getElementById('catalogAdminTable');
         if (!tbody) return;
 
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-primary spinner-border-sm"></div> Cargando catálogo...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary spinner-border-sm"></div> Cargando porciones y recetas...</td></tr>`;
 
         try {
             const res = await API.getProducts();
             if (res.success && res.data) {
                 this.allProducts = res.data;
-                tbody.innerHTML = res.data.map(p => `
+                tbody.innerHTML = res.data.map(p => {
+                    const porciones = parseInt(p.porciones_disponibles ?? p.stock);
+                    const inStock = porciones > 0;
+                    const costoBOM = parseFloat(p.costo_produccion || 0);
+                    const faltantes = (p.insumos_faltantes && p.insumos_faltantes.length) ? p.insumos_faltantes.join(', ') : '';
+
+                    return `
                     <tr class="prod-row-${p.id}">
                         <td class="font-monospace text-muted small">#${p.id}</td>
                         <td>
@@ -401,27 +422,34 @@ const Admin = {
                         </td>
                         <td><span class="badge bg-light text-primary">${p.categoria_nombre}</span></td>
                         <td><span class="font-monospace text-dark fw-bold" id="precioDisplay-${p.id}">$${parseFloat(p.precio).toFixed(2)}</span></td>
+                        <td><span class="font-monospace text-indigo fw-bold">${costoBOM > 0 ? '$' + costoBOM.toFixed(2) : '<span class="text-muted">Directo</span>'}</span></td>
                         <td>
-                            ${parseInt(p.stock) > 0
-                                ? `<span class="badge bg-green-lt">${p.stock} unid.</span>`
-                                : `<span class="badge bg-red-lt"><i class="ti ti-alert-circle me-1"></i>Agotado</span>`}
+                            ${inStock
+                                ? `<span class="badge bg-green-lt fw-bold fs-3 px-2 py-1">${porciones} porciones</span>`
+                                : `<span class="badge bg-red-lt fw-bold px-2 py-1"><i class="ti ti-ban me-1"></i>0 porciones</span>`}
+                        </td>
+                        <td>
+                            ${inStock 
+                                ? `<span class="badge bg-green-lt"><i class="ti ti-circle-check me-1"></i>Disponible para venta</span>`
+                                : `<span class="badge bg-red-lt" title="Insumo faltante: ${faltantes}"><i class="ti ti-alert-triangle me-1"></i>Agotado (${faltantes || 'Sin insumos'})</span>`}
                         </td>
                         <td class="text-end">
                             <div class="btn-list justify-content-end">
+                                <button class="btn btn-outline-cyan btn-sm" onclick="Admin.openRecipeModal(${p.id})">
+                                    <i class="ti ti-receipt-2 me-1"></i>Ficha Técnica (BOM)
+                                </button>
                                 <button class="btn btn-outline-primary btn-sm" onclick="Admin.openEditPriceModal(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio})">
                                     <i class="ti ti-currency-dollar me-1"></i>Precio
-                                </button>
-                                <button class="btn btn-outline-cyan btn-sm" onclick="Admin.openEditStockModal(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.stock})">
-                                    <i class="ti ti-package me-1"></i>Stock
                                 </button>
                             </div>
                         </td>
                     </tr>
-                `).join('');
+                `;
+                }).join('');
             }
         } catch (e) {
             console.error('Error cargando catálogo admin:', e);
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger"><i class="ti ti-alert-triangle me-2"></i>Error al cargar el catálogo. Verifica la conexión con el servicio.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-danger"><i class="ti ti-alert-triangle me-2"></i>Error al cargar el catálogo. Verifica la conexión con el servicio.</td></tr>`;
         }
     },
 
@@ -466,6 +494,473 @@ const Admin = {
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<i class="ti ti-check me-1"></i>Guardar y Auditar';
+        }
+    },
+
+    // ============================================================
+    // 2.5 INVENTARIO DE MATERIAS PRIMAS (Tab: tab-inventory)
+    // ============================================================
+    async loadInventoryAdmin() {
+        const tbody = document.getElementById('rawMaterialsTable');
+        if (!tbody) return;
+
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary spinner-border-sm"></div> Cargando materias primas...</td></tr>`;
+
+        try {
+            const params = {};
+            if (this.filterLowStockOnly) params.bajo_stock = 1;
+            const cat = document.getElementById('filterMpCategoria')?.value;
+            if (cat) params.categoria = cat;
+            const search = document.getElementById('filterMpSearch')?.value;
+            if (search) params.q = search;
+
+            const res = await API.getRawMaterials(params);
+            if (res.success && res.data) {
+                this.allRawMaterials = res.data;
+
+                // Actualizar KPIs de inventario
+                const totalInsumos = res.data.length;
+                const lowStock = res.data.filter(m => m.alerta_bajo_stock && !m.agotado).length;
+                const outStock = res.data.filter(m => m.agotado).length;
+                const valorTotal = res.data.reduce((sum, m) => sum + parseFloat(m.valor_inventario || 0), 0);
+
+                const kpiTotal = document.getElementById('kpiTotalMp');
+                const kpiLow = document.getElementById('kpiLowStockMp');
+                const kpiOut = document.getElementById('kpiOutStockMp');
+                const kpiVal = document.getElementById('kpiValorInventario');
+                const kpiBadge = document.getElementById('kpiTotalMpBadge');
+
+                if (kpiTotal) kpiTotal.textContent = totalInsumos;
+                if (kpiLow) kpiLow.textContent = lowStock;
+                if (kpiOut) kpiOut.textContent = outStock;
+                if (kpiVal) kpiVal.textContent = `$${valorTotal.toFixed(2)}`;
+                if (kpiBadge) kpiBadge.textContent = `${totalInsumos} Registrados`;
+
+                if (res.data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted">No se encontraron materias primas con los filtros seleccionados.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = res.data.map(m => {
+                    const isOut = m.agotado;
+                    const isLow = m.alerta_bajo_stock && !isOut;
+
+                    let statusBadge = `<span class="badge bg-green-lt"><i class="ti ti-check me-1"></i>En Stock</span>`;
+                    if (isOut) {
+                        statusBadge = `<span class="badge bg-red-lt fw-bold"><i class="ti ti-ban me-1"></i>Agotado</span>`;
+                    } else if (isLow) {
+                        statusBadge = `<span class="badge bg-yellow-lt fw-bold"><i class="ti ti-alert-triangle me-1"></i>Stock Bajo</span>`;
+                    }
+
+                    // Unidad badge
+                    let unitColor = 'bg-blue-lt';
+                    if (['g', 'kg', 'lb', 'oz'].includes(m.unidad_medida)) unitColor = 'bg-purple-lt';
+                    else if (['ml', 'l'].includes(m.unidad_medida)) unitColor = 'bg-cyan-lt';
+                    else if (m.unidad_medida === 'unid') unitColor = 'bg-orange-lt';
+
+                    return `
+                        <tr class="mp-row-${m.id}">
+                            <td class="font-monospace fw-bold text-dark">${m.codigo}</td>
+                            <td>
+                                <div class="fw-bold text-dark">${m.nombre}</div>
+                                <small class="text-muted">${m.categoria}</small>
+                            </td>
+                            <td><span class="badge bg-light text-primary">${m.categoria}</span></td>
+                            <td><span class="badge ${unitColor} font-monospace text-uppercase">${m.unidad_medida}</span></td>
+                            <td>
+                                <span class="font-monospace fw-bold fs-3 ${isOut ? 'text-danger' : (isLow ? 'text-warning' : 'text-dark')}">
+                                    ${m.stock_formateado}
+                                </span>
+                            </td>
+                            <td class="text-muted font-monospace small">${m.minimo_formateado}</td>
+                            <td class="font-monospace text-muted">$${parseFloat(m.costo_unitario).toFixed(3)}</td>
+                            <td>${statusBadge}</td>
+                            <td class="text-end">
+                                <div class="btn-list justify-content-end">
+                                    <button class="btn btn-outline-green btn-sm" title="Reabastecer / Entrada de compra" onclick="Admin.openMovementModal(${m.id}, 'entrada_compra')">
+                                        <i class="ti ti-plus me-1"></i>Entrada
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" title="Registrar desperdicio o merma de cocina" onclick="Admin.openMovementModal(${m.id}, 'merma_ajuste')">
+                                        <i class="ti ti-minus me-1"></i>Merma
+                                    </button>
+                                    <button class="btn btn-outline-cyan btn-sm" title="Ver movimientos históricos en Kardex" onclick="Admin.openKardexModal(${m.id})">
+                                        <i class="ti ti-history me-1"></i>Kardex
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        } catch (e) {
+            console.error('Error cargando materias primas:', e);
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-danger"><i class="ti ti-alert-triangle me-2"></i>Error al cargar materias primas: ${e.message}</td></tr>`;
+        }
+    },
+
+    filterRawMaterials() {
+        this.loadInventoryAdmin();
+    },
+
+    toggleLowStockMpFilter() {
+        this.filterLowStockOnly = !this.filterLowStockOnly;
+        const btn = document.getElementById('btnFilterLowStockMp');
+        if (btn) btn.classList.toggle('active', this.filterLowStockOnly);
+        this.loadInventoryAdmin();
+    },
+
+    openAddRawMaterialModal() {
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addRawMaterialModal'));
+        modal.show();
+    },
+
+    async submitAddRawMaterial(e) {
+        e.preventDefault();
+        const btn = e.target.querySelector('[type=submit]');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
+
+        const data = {
+            codigo: document.getElementById('addMpCodigo').value.trim().toUpperCase(),
+            nombre: document.getElementById('addMpNombre').value.trim(),
+            categoria: document.getElementById('addMpCategoria').value,
+            unidad_medida: document.getElementById('addMpUnidad').value,
+            stock_actual: parseFloat(document.getElementById('addMpStock').value) || 0,
+            stock_minimo: parseFloat(document.getElementById('addMpMinimo').value) || 5,
+            costo_unitario: parseFloat(document.getElementById('addMpCosto').value) || 0
+        };
+
+        try {
+            const res = await API.addRawMaterial(data);
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('addRawMaterialModal'))?.hide();
+                this.showAdminToast(`✓ Insumo '${data.nombre}' registrado correctamente`, 'success');
+                e.target.reset();
+                this.loadInventoryAdmin();
+            }
+        } catch (err) {
+            this.showAdminToast(`Error: ${err.message}`, 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ti ti-check me-1"></i> Guardar Materia Prima';
+        }
+    },
+
+    openMovementModal(mpId, tipo = 'entrada_compra') {
+        const mp = this.allRawMaterials.find(m => m.id === mpId);
+        if (!mp) return;
+
+        document.getElementById('movMpId').value = mp.id;
+        document.getElementById('movMpNombre').textContent = mp.nombre;
+        document.getElementById('movMpCodigo').textContent = mp.codigo;
+        document.getElementById('movMpStockActual').textContent = mp.stock_formateado;
+        document.getElementById('movUnidadLabel').textContent = mp.unidad_medida;
+        document.getElementById('movUnidadAddon').textContent = mp.unidad_medida;
+        document.getElementById('movTipo').value = tipo;
+        document.getElementById('movCantidad').value = '';
+        document.getElementById('movReferencia').value = tipo === 'entrada_compra' ? 'FAC-PROV-' + Math.floor(1000 + Math.random() * 9000) : 'MERMA-COCINA';
+        document.getElementById('movMotivo').value = tipo === 'entrada_compra' ? 'Reabastecimiento de insumos para cocina' : 'Merma de producción / porcionado';
+
+        this.handleMovTypeChange();
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('movementModal'));
+        modal.show();
+    },
+
+    handleMovTypeChange() {
+        const tipo = document.getElementById('movTipo')?.value;
+        const titleEl = document.getElementById('movementModalTitle');
+        const submitBtn = document.getElementById('btnSubmitMov');
+
+        if (tipo === 'entrada_compra') {
+            if (titleEl) titleEl.innerHTML = '<i class="ti ti-package-import me-1 text-green"></i> Registrar Entrada por Compra (+)';
+            if (submitBtn) submitBtn.className = 'btn btn-success';
+        } else if (tipo === 'merma_ajuste') {
+            if (titleEl) titleEl.innerHTML = '<i class="ti ti-trash me-1 text-danger"></i> Registrar Merma / Desperdicio (-)';
+            if (submitBtn) submitBtn.className = 'btn btn-danger';
+        } else {
+            if (titleEl) titleEl.innerHTML = '<i class="ti ti-adjustments me-1 text-primary"></i> Ajuste Físico de Inventario';
+            if (submitBtn) submitBtn.className = 'btn btn-primary';
+        }
+    },
+
+    async submitMovement(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnSubmitMov');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Procesando...';
+
+        const id = document.getElementById('movMpId').value;
+        const data = {
+            tipo_movimiento: document.getElementById('movTipo').value,
+            cantidad: parseFloat(document.getElementById('movCantidad').value) || 0,
+            referencia_id: document.getElementById('movReferencia').value.trim(),
+            motivo: document.getElementById('movMotivo').value.trim()
+        };
+
+        try {
+            const res = await API.addRawMaterialMovement(id, data);
+            if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('movementModal'))?.hide();
+                this.showAdminToast(`✓ ${res.message}`, 'success');
+                this.loadInventoryAdmin();
+                this.loadCatalogAdmin(); // Actualiza porciones en el menú
+            }
+        } catch (err) {
+            this.showAdminToast(`Error: ${err.message}`, 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ti ti-check me-1"></i> Confirmar Movimiento';
+        }
+    },
+
+    async openKardexModal(mpId = null) {
+        const titleEl = document.getElementById('kardexModalTitle');
+        const subTitleEl = document.getElementById('kardexModalSubtitle');
+        const tbody = document.getElementById('kardexTableBody');
+
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-primary spinner-border-sm"></div> Cargando historial de movimientos...</td></tr>`;
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('kardexModal'));
+        modal.show();
+
+        try {
+            let res;
+            if (mpId) {
+                const mp = this.allRawMaterials.find(m => m.id === mpId);
+                if (titleEl) titleEl.innerHTML = `<i class="ti ti-history me-2 text-cyan"></i> Kardex: ${mp ? mp.nombre : 'Insumo #' + mpId}`;
+                if (subTitleEl) subTitleEl.textContent = `Trazabilidad completa de existencias (${mp ? mp.unidad_medida : ''})`;
+                res = await API.getRawMaterialKardex(mpId, 100);
+            } else {
+                if (titleEl) titleEl.innerHTML = `<i class="ti ti-history me-2 text-cyan"></i> Kardex Global de Bodega Central`;
+                if (subTitleEl) subTitleEl.textContent = 'Historial completo de consumos por pedidos, compras y mermas';
+                res = await API.getInventoryMovements({ limit: 150 });
+            }
+
+            if (res.success && res.data) {
+                if (res.data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted">No se registran movimientos para este insumo.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = res.data.map(mov => {
+                    const cant = parseFloat(mov.cantidad);
+                    const isPositive = cant >= 0;
+
+                    let tipoBadge = '<span class="badge bg-green-lt"><i class="ti ti-plus me-1"></i>Compra</span>';
+                    if (mov.tipo_movimiento === 'consumo_orden') {
+                        tipoBadge = '<span class="badge bg-purple-lt"><i class="ti ti-tools-kitchen-2 me-1"></i>Consumo Pedido</span>';
+                    } else if (mov.tipo_movimiento === 'merma_ajuste') {
+                        tipoBadge = '<span class="badge bg-red-lt"><i class="ti ti-trash me-1"></i>Merma</span>';
+                    } else if (mov.tipo_movimiento === 'devolucion_orden') {
+                        tipoBadge = '<span class="badge bg-cyan-lt"><i class="ti ti-arrow-back-up me-1"></i>Devolución</span>';
+                    }
+
+                    return `
+                        <tr>
+                            <td class="font-monospace small">${mov.created_at}</td>
+                            <td>
+                                <div class="fw-bold text-dark">${mov.materia_prima_nombre || 'Insumo #' + mov.id_materia_prima}</div>
+                                <small class="text-muted font-monospace">${mov.materia_prima_codigo || ''}</small>
+                            </td>
+                            <td>${tipoBadge}</td>
+                            <td>
+                                <span class="font-monospace fw-bold ${isPositive ? 'text-green' : 'text-danger'}">
+                                    ${isPositive ? '+' : ''}${cant} ${mov.unidad_medida}
+                                </span>
+                            </td>
+                            <td class="font-monospace text-muted">${parseFloat(mov.stock_anterior).toFixed(3)} ${mov.unidad_medida}</td>
+                            <td class="font-monospace fw-bold text-dark">${parseFloat(mov.stock_nuevo).toFixed(3)} ${mov.unidad_medida}</td>
+                            <td><span class="badge bg-light text-dark font-monospace">${mov.referencia_id || '—'}</span></td>
+                            <td class="small text-muted">${mov.usuario_email ? mov.usuario_email.split('@')[0] : 'Sistema'}</td>
+                            <td class="small text-secondary" style="max-width: 250px;">${mov.motivo || '—'}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-danger"><i class="ti ti-alert-triangle me-2"></i>Error al consultar Kardex: ${err.message}</td></tr>`;
+        }
+    },
+
+    // ============================================================
+    // 2.6 ESCANDALLO DE RECETAS (BOM)
+    // ============================================================
+    async openRecipeModal(productId) {
+        const prod = this.allProducts.find(p => p.id === productId);
+        if (!prod) return;
+
+        document.getElementById('recipeProdId').value = productId;
+        document.getElementById('recipeDishTitle').textContent = prod.nombre;
+        document.getElementById('recipeDishCategory').textContent = prod.categoria_nombre;
+        document.getElementById('recipeDishPrice').textContent = `$${parseFloat(prod.precio).toFixed(2)}`;
+
+        const tbody = document.getElementById('recipeIngredientsTable');
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando ficha técnica...</td></tr>`;
+
+        // Llenar selector de materias primas si está vacío
+        await this.populateRecipeMpSelect();
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('recipeModal'));
+        modal.show();
+
+        try {
+            const res = await API.getProductRecipe(productId);
+            if (res.success && res.data) {
+                const data = res.data;
+                this.currentRecipeData = data;
+
+                const costo = parseFloat(data.costo_produccion || 0);
+                const precio = parseFloat(prod.precio || 0);
+                const margen = precio - costo;
+                const margenPct = precio > 0 ? ((margen / precio) * 100).toFixed(1) : 0;
+                const porciones = parseInt(data.available_portions || 0);
+
+                document.getElementById('recipeDishCost').textContent = `$${costo.toFixed(2)}`;
+                document.getElementById('recipeDishMargin').textContent = `$${margen.toFixed(2)} (${margenPct}%)`;
+                
+                const portionsEl = document.getElementById('recipeDishPortions');
+                portionsEl.textContent = `${porciones} porciones`;
+                portionsEl.className = `h2 mb-0 font-monospace ${porciones > 0 ? 'text-green' : 'text-danger'}`;
+
+                // Cuello de botella
+                const alertEl = document.getElementById('recipeBottleneckAlert');
+                const textEl = document.getElementById('recipeBottleneckText');
+                if (data.bottlenecks && data.bottlenecks.length > 0) {
+                    const bNames = data.bottlenecks.map(b => `${b.nombre} (Stock: ${b.stock_formateado}, Requiere: ${b.requerido_formateado})`).join('; ');
+                    textEl.innerHTML = `<strong>Platillo no disponible:</strong> Insumos insuficientes en bodega: ${bNames}`;
+                    alertEl.style.display = 'block';
+                } else {
+                    alertEl.style.display = 'none';
+                }
+
+                if (!data.ingredients || data.ingredients.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">Este platillo aún no tiene ingredientes asignados en su ficha técnica. Agrega el primero usando el formulario abajo.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = data.ingredients.map(ing => {
+                    const cantRec = `${ing.cantidad_receta} ${ing.unidad_receta}`;
+                    const stockBod = `${parseFloat(ing.stock_actual).toFixed(2)} ${ing.unidad_mp}`;
+                    const isLimit = ing.porciones_posibles <= 0;
+
+                    return `
+                        <tr>
+                            <td>
+                                <div class="fw-bold text-dark">${ing.nombre}</div>
+                                <small class="text-muted font-monospace">${ing.codigo}</small>
+                            </td>
+                            <td><span class="badge bg-light text-primary font-monospace fs-4 px-2">${cantRec}</span></td>
+                            <td class="font-monospace ${isLimit ? 'text-danger fw-bold' : 'text-muted'}">${stockBod}</td>
+                            <td>
+                                <span class="badge ${isLimit ? 'bg-red-lt fw-bold' : 'bg-green-lt'} font-monospace">
+                                    ${ing.porciones_posibles} porciones
+                                </span>
+                            </td>
+                            <td class="font-monospace text-muted">$${parseFloat(ing.costo_porcion).toFixed(3)}</td>
+                            <td>
+                                ${ing.es_critico 
+                                    ? '<span class="badge bg-danger-lt"><i class="ti ti-star me-1"></i>Crítico</span>' 
+                                    : '<span class="badge bg-secondary-lt">Opcional</span>'}
+                            </td>
+                            <td class="text-end">
+                                <button class="btn btn-outline-danger btn-sm p-1 px-2" title="Eliminar de la receta" onclick="Admin.deleteRecipeIngredient(${productId}, ${ing.materia_prima_id})">
+                                    <i class="ti ti-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger">Error cargando receta: ${err.message}</td></tr>`;
+        }
+    },
+
+    async populateRecipeMpSelect() {
+        const sel = document.getElementById('recMateriaPrimaSelect');
+        if (!sel || sel.options.length > 1) return;
+
+        if (this.allRawMaterials.length === 0) {
+            const res = await API.getRawMaterials();
+            if (res.success && res.data) {
+                this.allRawMaterials = res.data;
+            }
+        }
+
+        sel.innerHTML = '<option value="">Selecciona un insumo...</option>' + 
+            this.allRawMaterials.map(m => `
+                <option value="${m.id}" data-unidad="${m.unidad_medida}">${m.nombre} (${m.unidad_medida}) - Bodega: ${m.stock_formateado}</option>
+            `).join('');
+    },
+
+    handleRecipeMpSelectChange() {
+        const sel = document.getElementById('recMateriaPrimaSelect');
+        const opt = sel.options[sel.selectedIndex];
+        const unidad = opt?.getAttribute('data-unidad');
+        if (unidad) {
+            const uSel = document.getElementById('recUnidadSelect');
+            if (uSel) uSel.value = unidad;
+        }
+    },
+
+    async submitAddIngredient(e) {
+        e.preventDefault();
+        const prodId = document.getElementById('recipeProdId').value;
+        const mpId = document.getElementById('recMateriaPrimaSelect').value;
+        const cantidad = parseFloat(document.getElementById('recCantidadInput').value) || 0;
+        const unidad = document.getElementById('recUnidadSelect').value;
+        const esCritico = document.getElementById('recEsCritico').checked ? 1 : 0;
+
+        if (!mpId || cantidad <= 0) {
+            alert('Por favor selecciona una materia prima y una cantidad válida.');
+            return;
+        }
+
+        try {
+            const res = await API.saveRecipeIngredient(prodId, {
+                id_materia_prima: mpId,
+                cantidad_necesaria: cantidad,
+                unidad_medida: unidad,
+                es_critico: esCritico
+            });
+
+            if (res.success) {
+                this.showAdminToast(`✓ ${res.message}`, 'success');
+                document.getElementById('recCantidadInput').value = '';
+                this.openRecipeModal(parseInt(prodId));
+                this.loadCatalogAdmin();
+            }
+        } catch (err) {
+            this.showAdminToast(`Error: ${err.message}`, 'danger');
+        }
+    },
+
+    async deleteRecipeIngredient(productId, mpId) {
+        if (!confirm('¿Deseas remover este ingrediente de la ficha técnica del platillo?')) return;
+
+        try {
+            const res = await API.deleteRecipeIngredient(productId, mpId);
+            if (res.success) {
+                this.showAdminToast('✓ Ingrediente removido de la receta', 'info');
+                this.openRecipeModal(productId);
+                this.loadCatalogAdmin();
+            }
+        } catch (err) {
+            this.showAdminToast(`Error: ${err.message}`, 'danger');
+        }
+    },
+
+    async syncAllStock() {
+        try {
+            const res = await API.syncAllStock();
+            if (res.success) {
+                this.showAdminToast(`✓ Menú recalibrado: ${res.platillos_sincronizados} platillos actualizados según insumos de bodega.`, 'success');
+                this.loadCatalogAdmin();
+                this.loadInventoryAdmin();
+            }
+        } catch (err) {
+            this.showAdminToast(`Error al sincronizar menú: ${err.message}`, 'danger');
         }
     },
 
@@ -684,11 +1179,13 @@ const Admin = {
     // ============================================================
     // 4. GESTIÓN DE PEDIDOS
     // ============================================================
-    async loadOrdersAdmin() {
+    async loadOrdersAdmin(silent = false) {
         const tbody = document.getElementById('ordersAdminTable');
         if (!tbody) return;
 
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4"><div class="spinner-border text-primary spinner-border-sm"></div> Cargando pedidos...</td></tr>`;
+        if (!silent) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4"><div class="spinner-border text-primary spinner-border-sm"></div> Cargando pedidos...</td></tr>`;
+        }
 
         try {
             const res = await API.getOrders({ limit: 100 });
