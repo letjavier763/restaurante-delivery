@@ -61,15 +61,22 @@ const Admin = {
         const emailEl = document.getElementById('adminUserEmail');
         if (emailEl) emailEl.textContent = `${user.nombre} (${user.email})`;
 
-        // Ajustar visibilidad de pestañas según rol
+        // Para rol 'admin', mostrar todas las pestañas sin restricciones
+        if (user.rol === 'admin') {
+            document.querySelectorAll('#adminTabs .nav-item').forEach(li => {
+                li.style.display = '';
+            });
+            return;
+        }
+
+        // Ajustar visibilidad de pestañas según rol operativo
         const tabsMap = {
-            'cocina': ['tab-orders', 'tab-products'],
+            'cocina': ['tab-orders', 'tab-inventory', 'tab-products', 'tab-catalog'],
             'auditor': ['tab-overview', 'tab-audit', 'tab-pci', 'tab-hardening'],
-            'admin': ['tab-overview', 'tab-products', 'tab-catalog', 'tab-orders', 'tab-users', 'tab-audit', 'tab-pci', 'tab-hardening'],
-            'operador': ['tab-orders', 'tab-catalog', 'tab-products']
+            'operador': ['tab-orders', 'tab-inventory', 'tab-products', 'tab-catalog']
         };
 
-        const allowedTabs = tabsMap[user.rol] || tabsMap['admin'];
+        const allowedTabs = tabsMap[user.rol] || ['tab-overview', 'tab-inventory', 'tab-products', 'tab-catalog', 'tab-orders', 'tab-users', 'tab-audit', 'tab-pci', 'tab-hardening'];
         document.querySelectorAll('#adminTabs .nav-item').forEach(li => {
             const link = li.querySelector('a');
             if (!link) return;
@@ -200,11 +207,19 @@ const Admin = {
     // ============================================================
     async loadDashboard() {
         try {
-            const [metricsRes, productsRes, ordersRes] = await Promise.allSettled([
+            const [metricsRes, productsRes, ordersRes, rawMatRes] = await Promise.allSettled([
                 API.getAuditMetrics(),
                 API.getProducts(),
-                API.getOrders({ limit: 200 })
+                API.getOrders({ limit: 200 }),
+                API.getRawMaterials()
             ]);
+
+            if (rawMatRes.status === 'fulfilled' && rawMatRes.value.success) {
+                const navBadge = document.getElementById('navMpBadge');
+                if (navBadge && Array.isArray(rawMatRes.value.data)) {
+                    navBadge.textContent = `${rawMatRes.value.data.length} Insumos`;
+                }
+            }
 
             // KPIs dinámicos
             if (ordersRes.status === 'fulfilled' && ordersRes.value.success) {
@@ -447,7 +462,7 @@ const Admin = {
                                 <button class="btn btn-outline-cyan btn-sm" onclick="Admin.openRecipeModal(${p.id})">
                                     <i class="ti ti-receipt-2 me-1"></i>Ficha Técnica (BOM)
                                 </button>
-                                <button class="btn btn-outline-primary btn-sm" onclick="Admin.openEditPriceModal(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio})">
+                                <button class="btn btn-outline-primary btn-sm" onclick="Admin.openEditPriceModal(${p.id})">
                                     <i class="ti ti-tag me-1"></i>Precio
                                 </button>
                             </div>
@@ -463,9 +478,16 @@ const Admin = {
     },
 
     openEditPriceModal(id, nombre, precioActual) {
+        if (!nombre || precioActual === undefined) {
+            const p = (this.allProducts || []).find(item => item.id == id);
+            if (p) {
+                nombre = nombre || p.nombre;
+                precioActual = precioActual !== undefined ? precioActual : p.precio;
+            }
+        }
         document.getElementById('editProdId').value = id;
-        document.getElementById('editProdNombre').textContent = nombre;
-        document.getElementById('editProdPrecio').value = precioActual;
+        document.getElementById('editProdNombre').textContent = nombre || `Platillo #${id}`;
+        document.getElementById('editProdPrecio').value = precioActual || 0;
         document.getElementById('editProdMotivo').value = 'Actualización de temporada';
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editPriceModal'));
         modal.show();
@@ -1009,19 +1031,34 @@ const Admin = {
 
         try {
             const res = await API.getProducts();
-            if (res.success && res.data) {
+            if (res && res.success && Array.isArray(res.data)) {
                 this.allProducts = res.data;
                 const counter = document.getElementById('productsCrudCount');
                 if (counter) counter.textContent = `${res.data.length} productos`;
 
+                if (res.data.length === 0) {
+                    container.innerHTML = `
+                    <div class="col-12 text-center py-5 text-muted">
+                        <i class="ti ti-tools-kitchen fs-1 d-block mb-2"></i>
+                        No hay productos registrados en el menú. Haz clic en "+ Nuevo Producto" para agregar el primero.
+                    </div>`;
+                    return;
+                }
+
                 container.innerHTML = res.data.map(p => {
-                    const porciones = p.porciones_disponibles ?? p.stock ?? 0;
-                    const inStock = p.en_stock ?? (parseInt(porciones) > 0);
+                    const porciones = parseInt(p.porciones_disponibles ?? p.stock ?? 0);
+                    const inStock = p.en_stock ?? (porciones > 0);
+                    const nombreSafe = (p.nombre || 'Platillo').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const precioSafe = parseFloat(p.precio || 0).toFixed(2);
+                    const skuSafe = p.sku || `SKU-${p.id}`;
+                    const catSafe = p.categoria_nombre || 'Menú';
+                    const imgSafe = p.imagen_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
+
                     return `
                     <div class="col-sm-6 col-lg-4 col-xl-3" id="prod-card-${p.id}">
                         <div class="card h-100 border-0 shadow-sm">
                             <div style="height: 160px; overflow: hidden; position: relative; background: #f8fafc;">
-                                <img src="${p.imagen_url}" alt="${p.nombre}" style="width: 100%; height: 100%; object-fit: cover;"/>
+                                <img src="${imgSafe}" alt="${nombreSafe}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80'"/>
                                 <div class="position-absolute top-0 end-0 m-2">
                                     ${inStock
                                         ? `<span class="badge bg-green text-white shadow-sm font-monospace">${porciones} porc.</span>`
@@ -1031,13 +1068,13 @@ const Admin = {
                             </div>
                             <div class="card-body p-3">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="badge bg-primary-lt">${p.categoria_nombre}</span>
+                                    <span class="badge bg-primary-lt">${catSafe}</span>
                                     ${p.tiene_receta ? `<span class="badge bg-purple-lt small" title="Ficha Técnica Escandallo Activa"><i class="ti ti-receipt-2 me-1"></i>Receta BOM</span>` : `<span class="badge bg-secondary-lt small">Directo</span>`}
                                 </div>
-                                <h4 class="card-title text-dark mb-1 text-truncate" style="font-size: 0.95rem;" title="${p.nombre}">${p.nombre}</h4>
+                                <h4 class="card-title text-dark mb-1 text-truncate" style="font-size: 0.95rem;" title="${nombreSafe}">${nombreSafe}</h4>
                                 <div class="d-flex justify-content-between align-items-baseline mb-3">
-                                    <div class="font-monospace text-primary fw-bold fs-3">Q${parseFloat(p.precio).toFixed(2)}</div>
-                                    <small class="text-muted font-monospace">${p.sku}</small>
+                                    <div class="font-monospace text-primary fw-bold fs-3">Q${precioSafe}</div>
+                                    <small class="text-muted font-monospace">${skuSafe}</small>
                                 </div>
                                 <div class="d-flex gap-1">
                                     <button class="btn btn-outline-cyan btn-sm" onclick="Admin.openRecipeModal(${p.id})" title="Ver/Editar Receta BOM">
@@ -1046,7 +1083,7 @@ const Admin = {
                                     <button class="btn btn-outline-primary btn-sm flex-fill" onclick="Admin.openEditProductModal(${p.id})">
                                         <i class="ti ti-edit me-1"></i>Editar
                                     </button>
-                                    <button class="btn btn-outline-danger btn-sm" onclick="Admin.confirmDeleteProduct(${p.id}, '${p.nombre.replace(/'/g, "\\'")}')" title="Eliminar del menú">
+                                    <button class="btn btn-outline-danger btn-sm" onclick="Admin.confirmDeleteProduct(${p.id})" title="Eliminar del menú">
                                         <i class="ti ti-trash"></i>
                                     </button>
                                 </div>
@@ -1055,9 +1092,20 @@ const Admin = {
                     </div>
                     `;
                 }).join('');
+            } else {
+                throw new Error(res?.error || 'Respuesta inesperada del microservicio de catálogo');
             }
         } catch (e) {
-            container.innerHTML = `<div class="col-12 text-center py-5 text-danger"><i class="ti ti-alert-triangle fs-1 d-block mb-2"></i>Error al cargar productos.</div>`;
+            console.error('Error cargando productos:', e);
+            container.innerHTML = `
+                <div class="col-12 text-center py-5 text-danger">
+                    <i class="ti ti-alert-triangle fs-1 d-block mb-2"></i>
+                    <div class="fw-bold mb-1">Error al cargar productos: ${e.message || 'Error de conexión'}</div>
+                    <div class="text-muted small mb-3">Asegúrate de que el microservicio de catálogo esté activo y accesible.</div>
+                    <button class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="Admin.loadProductsCrud()">
+                        <i class="ti ti-refresh me-1"></i> Reintentar
+                    </button>
+                </div>`;
         }
     },
 
@@ -1273,7 +1321,7 @@ const Admin = {
     },
 
     openEditProductModal(id) {
-        const prod = this.allProducts.find(p => p.id === id);
+        const prod = (this.allProducts || []).find(p => p.id == id);
         if (!prod) return;
 
         document.getElementById('editProductId').value = id;
@@ -1284,17 +1332,18 @@ const Admin = {
         if (stockBadge) stockBadge.textContent = `${porciones} porciones disponibles`;
         const stockInput = document.getElementById('editProductStock');
         if (stockInput) stockInput.value = porciones;
-        document.getElementById('editProductDescripcion').value = prod.descripcion;
-        document.getElementById('editProductImagen').value = prod.imagen_url;
+        document.getElementById('editProductDescripcion').value = prod.descripcion || '';
+        document.getElementById('editProductImagen').value = prod.imagen_url || '';
         document.getElementById('editProductDestacado').checked = prod.destacado == 1;
 
         // Cargar categorías
+        const catId = prod.id_categoria || prod.categoria_id;
         API.getCategories().then(res => {
             if (res.success && res.data) {
                 const sel = document.getElementById('editProductCategoria');
                 if (sel) {
                     sel.innerHTML = res.data.map(c =>
-                        `<option value="${c.id}" ${c.id == prod.categoria_id ? 'selected' : ''}>${c.nombre}</option>`
+                        `<option value="${c.id}" ${c.id == catId ? 'selected' : ''}>${c.nombre}</option>`
                     ).join('');
                 }
             }
@@ -1418,6 +1467,10 @@ const Admin = {
     },
 
     confirmDeleteProduct(id, nombre) {
+        if (!nombre) {
+            const prod = (this.allProducts || []).find(p => p.id == id);
+            nombre = prod ? prod.nombre : `Platillo #${id}`;
+        }
         document.getElementById('deleteProductId').value = id;
         document.getElementById('deleteProductNombre').textContent = nombre;
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('deleteProductModal'));
@@ -1746,7 +1799,7 @@ const Admin = {
                             <td class="text-end">
                                 <div class="btn-list justify-content-end">
                                     <button class="btn btn-outline-${parseInt(u.activo) === 1 ? 'warning' : 'success'} btn-sm"
-                                        onclick="Admin.toggleUserStatus(${u.id}, ${u.activo}, '${u.nombre.replace(/'/g, "\\'")}')">
+                                        onclick="Admin.toggleUserStatus(${u.id}, ${u.activo})">
                                         <i class="ti ti-${parseInt(u.activo) === 1 ? 'user-x' : 'user-check'} me-1"></i>
                                         ${parseInt(u.activo) === 1 ? 'Desactivar' : 'Activar'}
                                     </button>
@@ -1781,6 +1834,10 @@ const Admin = {
     },
 
     async toggleUserStatus(id, currentStatus, nombre) {
+        if (!nombre) {
+            const u = (this.allUsers || []).find(item => item.id == id);
+            nombre = u ? u.nombre : `Usuario #${id}`;
+        }
         const nuevoEstado = parseInt(currentStatus) === 1 ? 0 : 1;
         const accion = nuevoEstado === 1 ? 'activar' : 'desactivar';
 
