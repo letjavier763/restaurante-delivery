@@ -663,3 +663,94 @@ pre {
     box-shadow: 0 16px 32px -4px rgba(225, 29, 72, 0.6);
 }
 
+/* ── BOTONES CON BORDES MÁS REDONDEADOS (PILL / ROUNDED) ─────────── */
+.btn,
+.btn-sm,
+.btn-lg,
+.btn-md,
+.btn-action,
+.btn-icon,
+.mode-btn,
+.cat-pill-btn {
+    border-radius: 50px !important;
+}
+
+.btn-group > .btn:first-child {
+    border-top-left-radius: 50px !important;
+    border-bottom-left-radius: 50px !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+.btn-group > .btn:last-child {
+    border-top-right-radius: 50px !important;
+    border-bottom-right-radius: 50px !important;
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+}
+
+.btn-group > .btn:not(:first-child):not(:last-child) {
+    border-radius: 0 !important;
+}
+
+/* Redondear suavemente campos de formulario e inputs */
+.form-control,
+.form-select,
+.input-group-text {
+    border-radius: 12px;
+}
+
+.input-group > .form-control:first-child,
+.input-group > .input-group-text:first-child {
+    border-top-left-radius: 12px !important;
+    border-bottom-left-radius: 12px !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+.input-group > .form-control:last-child,
+.input-group > .input-group-text:last-child,
+.input-group > .btn:last-child {
+    border-top-right-radius: 12px !important;
+    border-bottom-right-radius: 12px !important;
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+}
+
+/* ── CORRECCIÓN INTEGRAL DE MODALES SCROLLABLES Y FOOTER RECORTE ── */
+.modal-dialog-scrollable {
+    max-height: calc(100vh - 2rem) !important;
+}
+
+.modal-dialog-scrollable .modal-content,
+.modal-dialog-scrollable form.modal-content {
+    max-height: calc(100vh - 3rem) !important;
+    height: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    border-radius: 20px !important;
+    overflow: hidden !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+
+.modal-dialog-scrollable .modal-header {
+    flex-shrink: 0 !important;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 1rem 1.5rem;
+}
+
+.modal-dialog-scrollable .modal-footer {
+    flex-shrink: 0 !important;
+    border-top: 1px solid #e2e8f0;
+    padding: 0.85rem 1.5rem;
+    background-color: #f8fafc;
+    z-index: 10;
+}
+
+.modal-dialog-scrollable .modal-body {
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+    max-height: calc(85vh - 140px) !important;
+    padding: 1.25rem 1.5rem !important;
+}
+

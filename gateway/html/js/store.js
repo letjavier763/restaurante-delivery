@@ -12,7 +12,7 @@ const Store = {
     dietaryFilter: null,
     orderMode: 'delivery', // 'delivery' | 'pickup'
     selectedBranch: 'Sucursal Zona 10 - Terraza Gourmet',
-    tipAmount: 3.00,
+    tipAmount: 10.00,
     paymentMethod: 'stripe',
     activeOrder: null,
 
@@ -162,7 +162,7 @@ const Store = {
         const subtotal = this.cart.reduce((sum, item) => sum + (parseFloat(item.precio) * item.cantidad), 0);
         const headerTotal = document.getElementById('cartTotalHeader');
         if (headerTotal) {
-            headerTotal.textContent = `$${subtotal.toFixed(2)}`;
+            headerTotal.textContent = `Q${subtotal.toFixed(2)}`;
         }
 
         // Actualizar barra flotante móvil
@@ -173,7 +173,7 @@ const Store = {
                 const countEl = document.getElementById('mobileCartCount');
                 const totalEl = document.getElementById('mobileCartTotal');
                 if (countEl) countEl.textContent = `${count} ${count === 1 ? 'ítem' : 'ítems'}`;
-                if (totalEl) totalEl.textContent = `$${subtotal.toFixed(2)}`;
+                if (totalEl) totalEl.textContent = `Q${subtotal.toFixed(2)}`;
             } else {
                 floatBar.style.display = 'none';
             }
@@ -182,14 +182,14 @@ const Store = {
 
     setTip(amount) {
         this.tipAmount = parseFloat(amount) || 0;
-        [0, 1.5, 3, 5].forEach(val => {
-            const btn = document.getElementById(`tipBtn${val === 0 ? '0' : val.toString().replace('.', '')}`);
+        [0, 10, 20, 30].forEach(val => {
+            const btn = document.getElementById(`tipBtn${val}`);
             if (btn) {
                 btn.classList.toggle('active', this.tipAmount === val);
             }
         });
         const cartPropina = document.getElementById('cartPropina');
-        if (cartPropina) cartPropina.textContent = `$${this.tipAmount.toFixed(2)}`;
+        if (cartPropina) cartPropina.textContent = `Q${this.tipAmount.toFixed(2)}`;
         this.updateCartCalculations();
     },
 
@@ -403,7 +403,7 @@ const Store = {
                             <div class="mt-auto pt-2 border-top d-flex justify-content-between align-items-center">
                                 <div>
                                     <div class="text-muted small fw-bold" style="font-size: 0.65rem;">PRECIO</div>
-                                    <div class="h2 mb-0 font-monospace text-dark fw-bold">$${parseFloat(prod.precio).toFixed(2)}</div>
+                                    <div class="h2 mb-0 font-monospace text-dark fw-bold">Q${parseFloat(prod.precio).toFixed(2)}</div>
                                 </div>
                                 <div class="d-flex gap-1">
                                     <button 
@@ -527,7 +527,7 @@ const Store = {
                     <img src="${item.imagen_url}" alt="${item.nombre}" class="rounded" style="width: 54px; height: 54px; object-fit: cover;"/>
                     <div class="flex-grow-1">
                         <h4 class="mb-0 text-dark small fw-bold" style="font-family: 'Playfair Display', serif;">${item.nombre}</h4>
-                        <div class="text-muted font-monospace small">$${item.precio.toFixed(2)} c/u</div>
+                        <div class="text-muted font-monospace small">Q${item.precio.toFixed(2)} c/u</div>
                         ${item.nota ? `<small class="text-primary fst-italic"><i class="ti ti-notes me-1"></i>${item.nota}</small>` : ''}
                     </div>
                     <div class="d-flex align-items-center gap-2">
@@ -536,7 +536,7 @@ const Store = {
                         <button class="btn btn-outline-secondary btn-icon btn-sm" onclick="Store.changeCartQuantity(${item.id}, 1)">+</button>
                     </div>
                     <div class="text-end font-monospace fw-bold text-dark" style="min-width: 60px;">
-                        $${(item.precio * item.cantidad).toFixed(2)}
+                        Q${(item.precio * item.cantidad).toFixed(2)}
                     </div>
                 </div>
             </div>
@@ -550,11 +550,12 @@ const Store = {
         const iva = subtotal * 0.12;
 
         // Reglas de negocio Delivery vs Pickup:
-        // Pickup siempre tiene $0.00 de envío.
-        // Delivery: Gratis si subtotal >= $25.00, sino $2.50.
+        // Pickup siempre tiene Q0.00 de envío.
+        // Delivery: Gratis si subtotal >= Q150.00, sino Q15.00.
+        const threshold = 150.00;
         let envio = 0.00;
         if (this.orderMode === 'delivery') {
-            envio = subtotal >= 25.00 ? 0.00 : (subtotal > 0 ? 2.50 : 0.00);
+            envio = subtotal >= threshold ? 0.00 : (subtotal > 0 ? 15.00 : 0.00);
         }
 
         const total = subtotal + iva + envio + (subtotal > 0 ? this.tipAmount : 0);
@@ -564,7 +565,6 @@ const Store = {
         const progText = document.getElementById('shippingProgressText');
         const progPct = document.getElementById('shippingPercentText');
         if (progBar && progText && progPct) {
-            const threshold = 25.00;
             const pct = Math.min(100, Math.round((subtotal / threshold) * 100));
             progBar.style.width = `${pct}%`;
             progPct.textContent = `${pct}%`;
@@ -573,7 +573,7 @@ const Store = {
                 progBar.className = 'progress-bar bg-green';
             } else {
                 const rest = (threshold - subtotal).toFixed(2);
-                progText.textContent = `Agrega $${rest} para envío gratis`;
+                progText.textContent = `Agrega Q${rest} para envío gratis`;
                 progBar.className = 'progress-bar bg-primary';
             }
         }
@@ -585,18 +585,18 @@ const Store = {
         const envLabel = document.getElementById('cartEnvioLabel');
         const totEl = document.getElementById('cartTotal');
 
-        if (subEl) subEl.textContent = `$${subtotal.toFixed(2)}`;
-        if (ivaEl) ivaEl.textContent = `$${iva.toFixed(2)}`;
+        if (subEl) subEl.textContent = `Q${subtotal.toFixed(2)}`;
+        if (ivaEl) ivaEl.textContent = `Q${iva.toFixed(2)}`;
         if (envEl) {
             if (this.orderMode === 'pickup') {
-                envEl.textContent = 'GRATIS ($0.00)';
+                envEl.textContent = 'GRATIS (Q0.00)';
                 if (envLabel) envLabel.textContent = 'Recojo en Sucursal:';
             } else {
-                envEl.textContent = envio === 0 ? 'GRATIS' : `$${envio.toFixed(2)}`;
+                envEl.textContent = envio === 0 ? 'GRATIS' : `Q${envio.toFixed(2)}`;
                 if (envLabel) envLabel.textContent = 'Costo de Envío:';
             }
         }
-        if (totEl) totEl.textContent = `$${total.toFixed(2)}`;
+        if (totEl) totEl.textContent = `Q${total.toFixed(2)}`;
     },
 
     // 6. PROCESO DE CHECKOUT SEGURO STRIPE (PCI-DSS)
@@ -619,11 +619,11 @@ const Store = {
         // Calcular total para el modal de checkout
         const subtotal = this.cart.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
         const iva = subtotal * 0.12;
-        const envio = this.orderMode === 'pickup' ? 0.00 : (subtotal >= 25.00 ? 0.00 : 2.50);
+        const envio = this.orderMode === 'pickup' ? 0.00 : (subtotal >= 150.00 ? 0.00 : 15.00);
         const total = subtotal + iva + envio + this.tipAmount;
 
         const totDisp = document.getElementById('checkoutTotalDisplay');
-        if (totDisp) totDisp.textContent = `$${total.toFixed(2)} USD`;
+        if (totDisp) totDisp.textContent = `Q${total.toFixed(2)} GTQ`;
 
         this.updateModeUI();
         const chkModal = new bootstrap.Modal(document.getElementById('checkoutModal'));
@@ -709,7 +709,7 @@ const Store = {
             if (ordNum) ordNum.textContent = pedido.numero_pedido;
             if (ordTipo) ordTipo.textContent = this.orderMode === 'delivery' ? 'Delivery a Domicilio' : `Pickup en ${this.selectedBranch}`;
             if (payIntent) payIntent.textContent = paymentIntentId;
-            if (succTot) succTot.textContent = `$${parseFloat(pedido.total).toFixed(2)}`;
+            if (succTot) succTot.textContent = `Q${parseFloat(pedido.total).toFixed(2)}`;
 
             const succModal = new bootstrap.Modal(document.getElementById('successModal'));
             succModal.show();
@@ -816,7 +816,7 @@ const Store = {
             itemsList.innerHTML = this.activeOrder.items.map(it => `
                 <div class="d-flex justify-content-between py-1 border-bottom">
                     <span>${it.cantidad || 1}x ${it.nombre_producto || it.nombre}</span>
-                    <span class="text-muted font-monospace">$${parseFloat(it.subtotal || (it.precio * (it.cantidad || 1))).toFixed(2)}</span>
+                    <span class="text-muted font-monospace">Q${parseFloat(it.subtotal || (it.precio * (it.cantidad || 1))).toFixed(2)}</span>
                 </div>
             `).join('');
         }
@@ -840,7 +840,7 @@ const Store = {
         if (qvTitle) qvTitle.textContent = prod.nombre;
         if (qvName) qvName.textContent = prod.nombre;
         if (qvDesc) qvDesc.textContent = prod.descripcion;
-        if (qvPrice) qvPrice.textContent = `$${parseFloat(prod.precio).toFixed(2)}`;
+        if (qvPrice) qvPrice.textContent = `Q${parseFloat(prod.precio).toFixed(2)}`;
         if (qvImage) {
             qvImage.src = prod.imagen_url;
             qvImage.alt = prod.nombre;
@@ -1072,7 +1072,7 @@ const Store = {
                             <td class="font-monospace fw-bold">${ord.numero_pedido}</td>
                             <td>${tipoText}</td>
                             <td class="small text-muted">${API.formatDate(ord.fecha)}</td>
-                            <td class="font-monospace text-primary fw-bold">$${parseFloat(ord.total).toFixed(2)}</td>
+                            <td class="font-monospace text-primary fw-bold">Q${parseFloat(ord.total).toFixed(2)}</td>
                             <td>${badge}</td>
                             <td>
                                 <button class="btn btn-outline-primary btn-sm py-0" onclick="Store.trackSpecificOrder(${ord.id})">

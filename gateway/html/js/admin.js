@@ -421,8 +421,8 @@ const Admin = {
                             </div>
                         </td>
                         <td><span class="badge bg-light text-primary">${p.categoria_nombre}</span></td>
-                        <td><span class="font-monospace text-dark fw-bold" id="precioDisplay-${p.id}">$${parseFloat(p.precio).toFixed(2)}</span></td>
-                        <td><span class="font-monospace text-indigo fw-bold">${costoBOM > 0 ? '$' + costoBOM.toFixed(2) : '<span class="text-muted">Directo</span>'}</span></td>
+                        <td><span class="font-monospace text-dark fw-bold" id="precioDisplay-${p.id}">Q${parseFloat(p.precio).toFixed(2)}</span></td>
+                        <td><span class="font-monospace text-indigo fw-bold">${costoBOM > 0 ? 'Q' + costoBOM.toFixed(2) : '<span class="text-muted">Directo</span>'}</span></td>
                         <td>
                             ${inStock
                                 ? `<span class="badge bg-green-lt fw-bold fs-3 px-2 py-1">${porciones} porciones</span>`
@@ -439,7 +439,7 @@ const Admin = {
                                     <i class="ti ti-receipt-2 me-1"></i>Ficha Técnica (BOM)
                                 </button>
                                 <button class="btn btn-outline-primary btn-sm" onclick="Admin.openEditPriceModal(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.precio})">
-                                    <i class="ti ti-currency-dollar me-1"></i>Precio
+                                    <i class="ti ti-tag me-1"></i>Precio
                                 </button>
                             </div>
                         </td>
@@ -533,7 +533,7 @@ const Admin = {
                 if (kpiTotal) kpiTotal.textContent = totalInsumos;
                 if (kpiLow) kpiLow.textContent = lowStock;
                 if (kpiOut) kpiOut.textContent = outStock;
-                if (kpiVal) kpiVal.textContent = `$${valorTotal.toFixed(2)}`;
+                if (kpiVal) kpiVal.textContent = `Q${valorTotal.toFixed(2)}`;
                 if (kpiBadge) kpiBadge.textContent = `${totalInsumos} Registrados`;
 
                 if (res.data.length === 0) {
@@ -573,7 +573,7 @@ const Admin = {
                                 </span>
                             </td>
                             <td class="text-muted font-monospace small">${m.minimo_formateado}</td>
-                            <td class="font-monospace text-muted">$${parseFloat(m.costo_unitario).toFixed(3)}</td>
+                            <td class="font-monospace text-muted">Q${parseFloat(m.costo_unitario).toFixed(3)}</td>
                             <td>${statusBadge}</td>
                             <td class="text-end">
                                 <div class="btn-list justify-content-end">
@@ -793,7 +793,7 @@ const Admin = {
         document.getElementById('recipeProdId').value = productId;
         document.getElementById('recipeDishTitle').textContent = prod.nombre;
         document.getElementById('recipeDishCategory').textContent = prod.categoria_nombre;
-        document.getElementById('recipeDishPrice').textContent = `$${parseFloat(prod.precio).toFixed(2)}`;
+        document.getElementById('recipeDishPrice').textContent = `Q${parseFloat(prod.precio).toFixed(2)}`;
 
         const tbody = document.getElementById('recipeIngredientsTable');
         tbody.innerHTML = `<tr><td colspan="7" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando ficha técnica...</td></tr>`;
@@ -816,8 +816,8 @@ const Admin = {
                 const margenPct = precio > 0 ? ((margen / precio) * 100).toFixed(1) : 0;
                 const porciones = parseInt(data.available_portions || 0);
 
-                document.getElementById('recipeDishCost').textContent = `$${costo.toFixed(2)}`;
-                document.getElementById('recipeDishMargin').textContent = `$${margen.toFixed(2)} (${margenPct}%)`;
+                document.getElementById('recipeDishCost').textContent = `Q${costo.toFixed(2)}`;
+                document.getElementById('recipeDishMargin').textContent = `Q${margen.toFixed(2)} (${margenPct}%)`;
                 
                 const portionsEl = document.getElementById('recipeDishPortions');
                 portionsEl.textContent = `${porciones} porciones`;
@@ -857,7 +857,7 @@ const Admin = {
                                     ${ing.porciones_posibles} porciones
                                 </span>
                             </td>
-                            <td class="font-monospace text-muted">$${parseFloat(ing.costo_porcion).toFixed(3)}</td>
+                            <td class="font-monospace text-muted">Q${parseFloat(ing.costo_porcion).toFixed(3)}</td>
                             <td>
                                 ${ing.es_critico 
                                     ? '<span class="badge bg-danger-lt"><i class="ti ti-star me-1"></i>Crítico</span>' 
@@ -1027,7 +1027,7 @@ const Admin = {
                                 </div>
                                 <h4 class="card-title text-dark mb-1 text-truncate" style="font-size: 0.95rem;" title="${p.nombre}">${p.nombre}</h4>
                                 <div class="d-flex justify-content-between align-items-baseline mb-3">
-                                    <div class="font-monospace text-primary fw-bold fs-3">$${parseFloat(p.precio).toFixed(2)}</div>
+                                    <div class="font-monospace text-primary fw-bold fs-3">Q${parseFloat(p.precio).toFixed(2)}</div>
                                     <small class="text-muted font-monospace">${p.sku}</small>
                                 </div>
                                 <div class="d-flex gap-1">
@@ -1140,7 +1140,7 @@ const Admin = {
                 </div>
             </td>
             <td>
-                <span class="new-prod-cost-display text-dark fw-bold small font-monospace">$0.00</span>
+                <span class="new-prod-cost-display text-dark fw-bold small font-monospace">Q0.00</span>
             </td>
             <td class="text-center">
                 <button type="button" class="btn btn-outline-danger btn-sm p-1" onclick="Admin.removeNewProductIngredientRow(this)" title="Quitar ingrediente">
@@ -1223,7 +1223,7 @@ const Admin = {
             totalCost += ingCost;
 
             if (costDisp) {
-                costDisp.textContent = `$${ingCost.toFixed(2)}`;
+                costDisp.textContent = `Q${ingCost.toFixed(2)}`;
             }
 
             // Cálculo de porciones
@@ -1238,7 +1238,7 @@ const Admin = {
 
         // Actualizar visualizador de Food Cost
         const foodCostEl = document.getElementById('newProdFoodCost');
-        if (foodCostEl) foodCostEl.textContent = `$${totalCost.toFixed(2)}`;
+        if (foodCostEl) foodCostEl.textContent = `Q${totalCost.toFixed(2)}`;
 
         // Margen estimado
         const precio = parseFloat(document.getElementById('addProdPrecio')?.value || 0);
@@ -1247,7 +1247,7 @@ const Admin = {
             if (precio > 0 && totalCost >= 0) {
                 const margenVal = ((precio - totalCost) / precio) * 100;
                 const ganancia = precio - totalCost;
-                margenEl.textContent = `${margenVal.toFixed(1)}% ($${ganancia.toFixed(2)})`;
+                margenEl.textContent = `${margenVal.toFixed(1)}% (Q${ganancia.toFixed(2)})`;
                 margenEl.className = margenVal >= 60 ? 'fw-bold text-green fs-4' : (margenVal >= 40 ? 'fw-bold text-yellow fs-4' : 'fw-bold text-red fs-4');
             } else {
                 margenEl.textContent = '—';
@@ -1486,7 +1486,7 @@ const Admin = {
                                 </small>
                             </td>
                             <td>
-                                <div class="font-monospace text-primary fw-bold">$${parseFloat(o.total).toFixed(2)}</div>
+                                <div class="font-monospace text-primary fw-bold">Q${parseFloat(o.total).toFixed(2)}</div>
                                 <small class="text-muted">${itemsCount} platillos</small>
                                 ${itemsSummary ? `<div class="small text-muted fst-italic" style="font-size:0.7rem; max-width:180px;">${itemsSummary}</div>` : ''}
                                 ${o.notas ? `<div class="badge bg-yellow-lt mt-1 text-wrap text-start" style="font-size:0.65rem;"><i class="ti ti-notes me-1"></i>${o.notas}</div>` : ''}
@@ -1583,7 +1583,7 @@ const Admin = {
                 ? o.items.map(it => `
                     <div class="d-flex justify-content-between align-items-center py-1 border-bottom small">
                         <span class="text-dark"><strong>${it.cantidad}x</strong> ${it.nombre_producto}</span>
-                        <span class="text-muted font-monospace">$${parseFloat(it.precio_unitario * it.cantidad).toFixed(2)}</span>
+                        <span class="text-muted font-monospace">Q${parseFloat(it.precio_unitario * it.cantidad).toFixed(2)}</span>
                     </div>
                   `).join('')
                 : '<div class="small text-muted py-1">Sin items cargados</div>';
@@ -1609,7 +1609,7 @@ const Admin = {
                         </div>
                     ` : ''}
                     <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                        <span class="font-monospace fw-bold text-primary fs-3">$${parseFloat(o.total).toFixed(2)}</span>
+                        <span class="font-monospace fw-bold text-primary fs-3">Q${parseFloat(o.total).toFixed(2)}</span>
                         ${nextAction ? `
                             <button class="btn btn-sm ${nextAction.btnClass}" onclick="Admin.changeOrderStatus(${o.id}, '${nextAction.status}')">
                                 <i class="${nextAction.icon} me-1"></i>${nextAction.label}
@@ -1949,7 +1949,7 @@ const Admin = {
             const data = await resp.json();
 
             const sampleRows = (data.sample_records || []).map(r => 
-                `    ID: ${r.id} | Pedido: ${r.id_pedido} | Monto: $${parseFloat(r.monto).toFixed(2)} | Intent: ${r.payment_intent_id} | Estado: ${r.stripe_status}`
+                `    ID: ${r.id} | Pedido: ${r.id_pedido} | Monto: Q${parseFloat(r.monto).toFixed(2)} | Intent: ${r.payment_intent_id} | Estado: ${r.stripe_status}`
             ).join('\n');
 
             resultBox.style.display = 'block';
