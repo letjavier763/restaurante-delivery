@@ -328,6 +328,7 @@ try {
         $imgUrl    = filter_var($input['imagen_url'] ?? '', FILTER_SANITIZE_URL);
         $destacado = (int)!empty($input['destacado']);
         $specs     = $input['especificaciones'] ?? null;
+        $receta    = $input['receta'] ?? null;
 
         if (empty($nombre) || empty($sku) || $precio <= 0 || $catId <= 0) {
             Security::jsonResponse(['success' => false, 'error' => 'Nombre, SKU, precio y categoría son obligatorios'], 400);
@@ -359,6 +360,35 @@ try {
         ]);
         $newId = (int)$masterDb->lastInsertId();
 
+        // Si se enviaron ingredientes para la receta (Ficha técnica BOM)
+        $porcionesCalculadas = $stock;
+        if (!empty($receta) && is_array($receta)) {
+            $recStmt = $masterDb->prepare("
+                INSERT INTO recetas (id_producto, id_materia_prima, cantidad_necesaria, unidad_medida, es_critico, notas, created_at)
+                VALUES (:pid, :mpid, :cant, :um, :crit, :not, NOW())
+            ");
+            foreach ($receta as $ing) {
+                $mpId = (int)($ing['id_materia_prima'] ?? 0);
+                $cant = (float)($ing['cantidad_necesaria'] ?? 0);
+                $um   = Security::sanitizeString($ing['unidad_medida'] ?? 'g');
+                $crit = isset($ing['es_critico']) ? (int)!empty($ing['es_critico']) : 1;
+                $not  = Security::sanitizeString($ing['notas'] ?? null);
+
+                if ($mpId > 0 && $cant > 0) {
+                    $recStmt->execute([
+                        ':pid'  => $newId,
+                        ':mpid' => $mpId,
+                        ':cant' => $cant,
+                        ':um'   => $um,
+                        ':crit' => $crit,
+                        ':not'  => $not
+                    ]);
+                }
+            }
+            // Sincronizar porciones calculadas en tiempo real según inventario de insumos
+            $porcionesCalculadas = InventoryManager::syncProductStock($masterDb, $newId);
+        }
+
         invalidateCatalogueCache();
 
         AuditClient::log(
@@ -368,14 +398,22 @@ try {
             $user['email'] ?? 'admin',
             'admin',
             null, null, null,
-            ['producto_id' => $newId, 'nombre' => $nombre, 'sku' => $sku, 'precio' => $precio],
+            [
+                'producto_id'         => $newId,
+                'nombre'              => $nombre,
+                'sku'                 => $sku,
+                'precio'              => $precio,
+                'tiene_receta'        => !empty($receta),
+                'porciones_iniciales' => $porcionesCalculadas
+            ],
             'EXITO'
         );
 
         Security::jsonResponse([
-            'success'    => true,
-            'message'    => 'Producto creado exitosamente',
-            'producto_id'=> $newId
+            'success'            => true,
+            'message'            => 'Producto creado exitosamente' . (!empty($receta) ? ' con su receta BOM configurada' : ''),
+            'producto_id'        => $newId,
+            'porciones_iniciales'=> $porcionesCalculadas
         ], 201);
     }
 

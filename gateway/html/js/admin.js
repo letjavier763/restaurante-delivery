@@ -1005,33 +1005,47 @@ const Admin = {
                 const counter = document.getElementById('productsCrudCount');
                 if (counter) counter.textContent = `${res.data.length} productos`;
 
-                container.innerHTML = res.data.map(p => `
+                container.innerHTML = res.data.map(p => {
+                    const porciones = p.porciones_disponibles ?? p.stock ?? 0;
+                    const inStock = p.en_stock ?? (parseInt(porciones) > 0);
+                    return `
                     <div class="col-sm-6 col-lg-4 col-xl-3" id="prod-card-${p.id}">
                         <div class="card h-100 border-0 shadow-sm">
                             <div style="height: 160px; overflow: hidden; position: relative; background: #f8fafc;">
                                 <img src="${p.imagen_url}" alt="${p.nombre}" style="width: 100%; height: 100%; object-fit: cover;"/>
                                 <div class="position-absolute top-0 end-0 m-2">
-                                    ${parseInt(p.stock) > 0
-                                        ? `<span class="badge bg-green-lt">${p.stock}</span>`
-                                        : `<span class="badge bg-red-lt">Agotado</span>`}
+                                    ${inStock
+                                        ? `<span class="badge bg-green text-white shadow-sm font-monospace">${porciones} porc.</span>`
+                                        : `<span class="badge bg-red text-white shadow-sm font-monospace">Agotado</span>`}
                                 </div>
+                                ${p.destacado == 1 ? `<div class="position-absolute top-0 start-0 m-2"><span class="badge bg-yellow text-dark"><i class="ti ti-star me-1"></i>Chef</span></div>` : ''}
                             </div>
                             <div class="card-body p-3">
-                                <span class="badge bg-primary-lt mb-2">${p.categoria_nombre}</span>
-                                <h4 class="card-title text-dark mb-1" style="font-size: 0.9rem; line-height: 1.3;">${p.nombre}</h4>
-                                <div class="font-monospace text-primary fw-bold mb-3">$${parseFloat(p.precio).toFixed(2)}</div>
-                                <div class="d-flex gap-2">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="badge bg-primary-lt">${p.categoria_nombre}</span>
+                                    ${p.tiene_receta ? `<span class="badge bg-purple-lt small" title="Ficha Técnica Escandallo Activa"><i class="ti ti-receipt-2 me-1"></i>Receta BOM</span>` : `<span class="badge bg-secondary-lt small">Directo</span>`}
+                                </div>
+                                <h4 class="card-title text-dark mb-1 text-truncate" style="font-size: 0.95rem;" title="${p.nombre}">${p.nombre}</h4>
+                                <div class="d-flex justify-content-between align-items-baseline mb-3">
+                                    <div class="font-monospace text-primary fw-bold fs-3">$${parseFloat(p.precio).toFixed(2)}</div>
+                                    <small class="text-muted font-monospace">${p.sku}</small>
+                                </div>
+                                <div class="d-flex gap-1">
+                                    <button class="btn btn-outline-cyan btn-sm" onclick="Admin.openRecipeModal(${p.id})" title="Ver/Editar Receta BOM">
+                                        <i class="ti ti-receipt-2"></i>
+                                    </button>
                                     <button class="btn btn-outline-primary btn-sm flex-fill" onclick="Admin.openEditProductModal(${p.id})">
                                         <i class="ti ti-edit me-1"></i>Editar
                                     </button>
-                                    <button class="btn btn-outline-danger btn-sm" onclick="Admin.confirmDeleteProduct(${p.id}, '${p.nombre.replace(/'/g, "\\'")}')">
+                                    <button class="btn btn-outline-danger btn-sm" onclick="Admin.confirmDeleteProduct(${p.id}, '${p.nombre.replace(/'/g, "\\'")}')" title="Eliminar del menú">
                                         <i class="ti ti-trash"></i>
                                     </button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                `).join('');
+                    `;
+                }).join('');
             }
         } catch (e) {
             container.innerHTML = `<div class="col-12 text-center py-5 text-danger"><i class="ti ti-alert-triangle fs-1 d-block mb-2"></i>Error al cargar productos.</div>`;
@@ -1041,6 +1055,11 @@ const Admin = {
     openAddProductModal() {
         const form = document.getElementById('addProductForm');
         if (form) form.reset();
+
+        // Valores por defecto
+        const tipoSel = document.getElementById('addProdTipo');
+        if (tipoSel) tipoSel.value = 'receta';
+        this.toggleNewProductType('receta');
 
         // Cargar categorías en el select
         API.getCategories().then(res => {
@@ -1052,8 +1071,196 @@ const Admin = {
             }
         }).catch(() => {});
 
+        // Cargar materias primas para el constructor de receta
+        API.getRawMaterials().then(res => {
+            if (res.success && res.data) {
+                this.availableRawMaterials = res.data;
+                const list = document.getElementById('newProductIngredientsList');
+                if (list) {
+                    list.innerHTML = '';
+                    // Añadir una primera fila vacía para que el chef empiece a diseñar
+                    this.addNewProductIngredientRow();
+                }
+                this.recalcNewProductCost();
+            }
+        }).catch(() => {});
+
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addProductModal'));
         modal.show();
+    },
+
+    toggleNewProductType(tipo) {
+        const recetaSec = document.getElementById('addProdRecetaSection');
+        const stockDirecto = document.getElementById('addProdStockDirectoContainer');
+        if (tipo === 'receta') {
+            if (recetaSec) recetaSec.style.display = 'block';
+            if (stockDirecto) stockDirecto.style.display = 'none';
+        } else {
+            if (recetaSec) recetaSec.style.display = 'none';
+            if (stockDirecto) stockDirecto.style.display = 'block';
+        }
+    },
+
+    addNewProductIngredientRow() {
+        const tbody = document.getElementById('newProductIngredientsList');
+        if (!tbody) return;
+
+        const mpOptions = (this.availableRawMaterials || []).map(m => 
+            `<option value="${m.id}" data-unit="${m.unidad_medida}" data-cost="${m.costo_unitario}" data-stock="${m.stock_actual}">
+                ${m.nombre} [Stock: ${m.stock_actual} ${m.unidad_medida}]
+            </option>`
+        ).join('');
+
+        const row = document.createElement('tr');
+        row.className = 'new-prod-ingredient-row align-middle';
+        row.innerHTML = `
+            <td>
+                <select class="form-select form-select-sm new-prod-mp-select" onchange="Admin.onNewProductMpChange(this)">
+                    ${mpOptions}
+                </select>
+            </td>
+            <td>
+                <input type="number" step="0.001" min="0.001" class="form-control form-control-sm new-prod-cant-input" value="100" oninput="Admin.recalcNewProductCost()"/>
+            </td>
+            <td>
+                <select class="form-select form-select-sm new-prod-unit-select" onchange="Admin.recalcNewProductCost()">
+                    <option value="g">g</option>
+                    <option value="kg">kg</option>
+                    <option value="lb">lb</option>
+                    <option value="oz">oz</option>
+                    <option value="ml">ml</option>
+                    <option value="l">l</option>
+                    <option value="unid">unid</option>
+                </select>
+            </td>
+            <td>
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input new-prod-critico" type="checkbox" checked onchange="Admin.recalcNewProductCost()" title="Si se agota este insumo, el platillo no se puede vender"/>
+                    <label class="form-check-label small text-muted">Crítico</label>
+                </div>
+            </td>
+            <td>
+                <span class="new-prod-cost-display text-dark fw-bold small font-monospace">$0.00</span>
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-outline-danger btn-sm p-1" onclick="Admin.removeNewProductIngredientRow(this)" title="Quitar ingrediente">
+                    <i class="ti ti-trash"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(row);
+
+        // Adaptar la unidad de medida a la seleccionada
+        const sel = row.querySelector('.new-prod-mp-select');
+        if (sel) this.onNewProductMpChange(sel);
+    },
+
+    onNewProductMpChange(selectElem) {
+        const row = selectElem.closest('tr');
+        if (!row) return;
+
+        const opt = selectElem.options[selectElem.selectedIndex];
+        if (!opt) return;
+
+        const unit = opt.getAttribute('data-unit') || 'g';
+        const unitSel = row.querySelector('.new-prod-unit-select');
+        if (unitSel) {
+            unitSel.value = unit;
+        }
+
+        this.recalcNewProductCost();
+    },
+
+    removeNewProductIngredientRow(btn) {
+        const row = btn.closest('tr');
+        if (row) {
+            row.remove();
+            this.recalcNewProductCost();
+        }
+    },
+
+    recalcNewProductCost() {
+        const rows = document.querySelectorAll('#newProductIngredientsList .new-prod-ingredient-row');
+        let totalCost = 0.0;
+        let minPortions = Infinity;
+        let hasCritical = false;
+
+        const weightFactors = { g: 1.0, kg: 1000.0, lb: 453.59237, oz: 28.3495 };
+        const volumeFactors = { ml: 1.0, l: 1000.0 };
+
+        rows.forEach(r => {
+            const mpSel = r.querySelector('.new-prod-mp-select');
+            const cantInput = r.querySelector('.new-prod-cant-input');
+            const unitSel = r.querySelector('.new-prod-unit-select');
+            const critBox = r.querySelector('.new-prod-critico');
+            const costDisp = r.querySelector('.new-prod-cost-display');
+
+            if (!mpSel || !cantInput || !unitSel) return;
+
+            const opt = mpSel.options[mpSel.selectedIndex];
+            if (!opt) return;
+
+            const costUnit = parseFloat(opt.getAttribute('data-cost') || 0);
+            const stockActual = parseFloat(opt.getAttribute('data-stock') || 0);
+            const mpUnit = opt.getAttribute('data-unit') || 'g';
+
+            const cant = parseFloat(cantInput.value || 0);
+            const recUnit = unitSel.value;
+            const isCrit = critBox ? critBox.checked : true;
+
+            // Conversión dimensional a la unidad de la materia prima
+            let cantInMp = cant;
+            if (recUnit !== mpUnit) {
+                if (weightFactors[recUnit] && weightFactors[mpUnit]) {
+                    cantInMp = (cant * weightFactors[recUnit]) / weightFactors[mpUnit];
+                } else if (volumeFactors[recUnit] && volumeFactors[mpUnit]) {
+                    cantInMp = (cant * volumeFactors[recUnit]) / volumeFactors[mpUnit];
+                }
+            }
+
+            const ingCost = cantInMp * costUnit;
+            totalCost += ingCost;
+
+            if (costDisp) {
+                costDisp.textContent = `$${ingCost.toFixed(2)}`;
+            }
+
+            // Cálculo de porciones
+            if (cantInMp > 0 && isCrit) {
+                hasCritical = true;
+                const possible = Math.floor(stockActual / cantInMp);
+                if (possible < minPortions) {
+                    minPortions = Math.max(0, possible);
+                }
+            }
+        });
+
+        // Actualizar visualizador de Food Cost
+        const foodCostEl = document.getElementById('newProdFoodCost');
+        if (foodCostEl) foodCostEl.textContent = `$${totalCost.toFixed(2)}`;
+
+        // Margen estimado
+        const precio = parseFloat(document.getElementById('addProdPrecio')?.value || 0);
+        const margenEl = document.getElementById('newProdMargen');
+        if (margenEl) {
+            if (precio > 0 && totalCost >= 0) {
+                const margenVal = ((precio - totalCost) / precio) * 100;
+                const ganancia = precio - totalCost;
+                margenEl.textContent = `${margenVal.toFixed(1)}% ($${ganancia.toFixed(2)})`;
+                margenEl.className = margenVal >= 60 ? 'fw-bold text-green fs-4' : (margenVal >= 40 ? 'fw-bold text-yellow fs-4' : 'fw-bold text-red fs-4');
+            } else {
+                margenEl.textContent = '—';
+            }
+        }
+
+        // Porciones estimadas
+        const porcionesEl = document.getElementById('newProdPorcionesEst');
+        if (porcionesEl) {
+            const finalPortions = (!hasCritical || minPortions === Infinity) ? 0 : minPortions;
+            porcionesEl.textContent = `${finalPortions} porciones preparables con bodega actual`;
+            porcionesEl.className = finalPortions > 0 ? 'badge bg-purple text-white fs-5 px-3 py-1' : 'badge bg-red text-white fs-5 px-3 py-1';
+        }
     },
 
     openEditProductModal(id) {
@@ -1084,35 +1291,84 @@ const Admin = {
         modal.show();
     },
 
+    openRecipeFromEdit() {
+        const id = parseInt(document.getElementById('editProductId')?.value || 0);
+        if (id > 0) {
+            bootstrap.Modal.getInstance(document.getElementById('editProductModal'))?.hide();
+            this.openRecipeModal(id);
+        }
+    },
+
     async submitAddProduct(e) {
         e.preventDefault();
         const btn = e.target.querySelector('[type=submit]');
         btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando platillo y receta...';
+
+        const tipo = document.getElementById('addProdTipo')?.value || 'receta';
+        const nombre = document.getElementById('addProdNombre').value;
+        const precio = parseFloat(document.getElementById('addProdPrecio').value);
+        const catId = parseInt(document.getElementById('addProdCategoria').value);
+        const sku = document.getElementById('addProdSku').value;
+        const desc = document.getElementById('addProdDescripcion').value;
+        const imgUrl = document.getElementById('addProdImagen').value;
+        const destacado = document.getElementById('addProdDestacado').checked ? 1 : 0;
+
+        // Extraer ingredientes si es tipo receta
+        const recetaItems = [];
+        if (tipo === 'receta') {
+            const rows = document.querySelectorAll('#newProductIngredientsList .new-prod-ingredient-row');
+            rows.forEach(r => {
+                const mpId = parseInt(r.querySelector('.new-prod-mp-select')?.value || 0);
+                const cant = parseFloat(r.querySelector('.new-prod-cant-input')?.value || 0);
+                const unidad = r.querySelector('.new-prod-unit-select')?.value || 'g';
+                const critico = r.querySelector('.new-prod-critico')?.checked ? 1 : 0;
+
+                if (mpId > 0 && cant > 0) {
+                    recetaItems.push({
+                        id_materia_prima: mpId,
+                        cantidad_necesaria: cant,
+                        unidad_medida: unidad,
+                        es_critico: critico
+                    });
+                }
+            });
+
+            if (recetaItems.length === 0) {
+                this.showAdminToast('Por favor añade al menos 1 ingrediente a la receta o cambia el tipo a "Artículo Directo".', 'warning');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="ti ti-check me-1"></i> Guardar Platillo y Activar en Menú';
+                return;
+            }
+        }
 
         const data = {
-            nombre: document.getElementById('addProdNombre').value,
-            precio: parseFloat(document.getElementById('addProdPrecio').value),
-            stock: parseInt(document.getElementById('addProdStock').value),
-            categoria_id: parseInt(document.getElementById('addProdCategoria').value),
-            descripcion: document.getElementById('addProdDescripcion').value,
-            imagen_url: document.getElementById('addProdImagen').value,
-            sku: document.getElementById('addProdSku').value,
-            destacado: document.getElementById('addProdDestacado').checked ? 1 : 0
+            nombre,
+            precio,
+            categoria_id: catId,
+            sku,
+            descripcion: desc,
+            imagen_url: imgUrl,
+            destacado,
+            stock: (tipo === 'directo') ? parseInt(document.getElementById('addProdStock')?.value || 0) : 0,
+            receta: (tipo === 'receta') ? recetaItems : null
         };
 
         try {
             const res = await API.addProduct(data);
             if (res.success) {
                 bootstrap.Modal.getInstance(document.getElementById('addProductModal'))?.hide();
-                this.showAdminToast('✓ Producto agregado exitosamente al catálogo.', 'success');
+                const porciones = res.porciones_iniciales ?? 0;
+                this.showAdminToast(`✓ Platillo creado exitosamente con ${porciones} porciones calculadas en stock.`, 'success');
                 this.loadProductsCrud();
+                this.loadCatalogAdmin();
+                this.loadInventoryAdmin();
             }
         } catch (err) {
             this.showAdminToast(`Error: ${err.message}`, 'danger');
         } finally {
             btn.disabled = false;
-            btn.innerHTML = '<i class="ti ti-plus me-1"></i>Agregar Producto';
+            btn.innerHTML = '<i class="ti ti-check me-1"></i> Guardar Platillo y Activar en Menú';
         }
     },
 

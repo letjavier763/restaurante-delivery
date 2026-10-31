@@ -87,7 +87,7 @@
                             </li>
                             <li class="nav-item">
                                 <a href="#tab-inventory" class="nav-link" onclick="Admin.switchTab('tab-inventory')">
-                                    <i class="ti ti-packages me-2 text-green"></i> Materias Primas &amp; Insumos
+                                    <i class="ti ti-packages me-2 text-green"></i> Módulo de Stock &amp; Bodega
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -959,62 +959,128 @@
         </div>
     </div>
 
-    <!-- MODAL: AGREGAR PRODUCTO -->
+    <!-- MODAL: AGREGAR PRODUCTO CON FICHA TÉCNICA / RECETA (BOM) -->
     <div class="modal modal-blur fade" id="addProductModal" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" role="document">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="ti ti-plus me-1 text-primary"></i> Agregar Nuevo Producto al Catálogo</h5>
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title"><i class="ti ti-tools-kitchen-2 me-2 text-red"></i> Agregar Nuevo Platillo / Producto al Menú</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="addProductForm">
                     <div class="modal-body">
-                        <div class="row g-3">
-                            <div class="col-md-8">
-                                <label class="form-label required" for="addProdNombre">Nombre del Producto</label>
-                                <input type="text" id="addProdNombre" class="form-control" required placeholder="Ej: ASUS ROG Strix B550-F Gaming"/>
+                        <!-- 1. DATOS GENERALES DEL PLATILLO -->
+                        <div class="card card-tech mb-3 border">
+                            <div class="card-header bg-white py-2">
+                                <h6 class="card-title mb-0 text-dark"><i class="ti ti-info-circle me-1 text-primary"></i> 1. Información General del Menú</h6>
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label required" for="addProdSku">SKU</label>
-                                <input type="text" id="addProdSku" class="form-control" required placeholder="TN-ASUS-001"/>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label required" for="addProdPrecio">Precio (USD)</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">$</span>
-                                    <input type="number" step="0.01" min="0.01" id="addProdPrecio" class="form-control" required placeholder="0.00"/>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-7">
+                                        <label class="form-label required" for="addProdNombre">Nombre del Platillo / Producto</label>
+                                        <input type="text" id="addProdNombre" class="form-control" required placeholder="Ej: Risotto de Hongos Porcini & Aceite de Trufa Blanca"/>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label required" for="addProdSku">Código / SKU Culinario</label>
+                                        <input type="text" id="addProdSku" class="form-control" required placeholder="PLT-RISOTTO-TRUF"/>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label required" for="addProdCategoria">Categoría del Menú</label>
+                                        <select id="addProdCategoria" class="form-select" required>
+                                            <option value="">Cargando categorías...</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label required" for="addProdPrecio">Precio de Venta Carta (USD)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" step="0.01" min="0.01" id="addProdPrecio" class="form-control" required placeholder="18.50" oninput="Admin.recalcNewProductCost()"/>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label required" for="addProdTipo">Tipo de Producto</label>
+                                        <select id="addProdTipo" class="form-select" onchange="Admin.toggleNewProductType(this.value)">
+                                            <option value="receta" selected>Platillo de Cocina (Preparado con Receta BOM)</option>
+                                            <option value="directo">Artículo Directo (Sin receta, ej. Bebida/Vino embotellado)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4" id="addProdStockDirectoContainer" style="display: none;">
+                                        <label class="form-label required" for="addProdStock">Stock Físico Inicial</label>
+                                        <input type="number" min="0" id="addProdStock" class="form-control" value="0" placeholder="0"/>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label" for="addProdImagen">URL de Imagen</label>
+                                        <input type="url" id="addProdImagen" class="form-control" placeholder="https://images.unsplash.com/..."/>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label" for="addProdDescripcion">Descripción Gastronómica</label>
+                                        <textarea id="addProdDescripcion" class="form-control" rows="2" placeholder="Describe los sabores, técnica de cocción e ingredientes principales..."></textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-check form-switch mb-0">
+                                            <input class="form-check-input" type="checkbox" id="addProdDestacado"/>
+                                            <span class="form-check-label">Destacar como Especialidad del Chef <i class="ti ti-star text-yellow ms-1"></i></span>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label required" for="addProdStock">Stock Inicial</label>
-                                <input type="number" min="0" id="addProdStock" class="form-control" required placeholder="0"/>
+                        </div>
+
+                        <!-- 2. DEFINICIÓN DE RECETA CULINARIA / ESCANDALLO (BOM) -->
+                        <div id="addProdRecetaSection" class="card card-tech border">
+                            <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="card-title mb-0 text-dark">
+                                        <i class="ti ti-receipt-2 me-1 text-green"></i> 2. Ficha Técnica &amp; Ingredientes de la Receta (BOM)
+                                    </h6>
+                                    <small class="text-muted">Define los insumos necesarios para preparar 1 porción. El stock de venta se calculará automáticamente en tiempo real.</small>
+                                </div>
+                                <button type="button" class="btn btn-outline-success btn-sm" onclick="Admin.addNewProductIngredientRow()">
+                                    <i class="ti ti-plus me-1"></i> Añadir Ingrediente
+                                </button>
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label required" for="addProdCategoria">Categoría</label>
-                                <select id="addProdCategoria" class="form-select" required>
-                                    <option value="">Cargando...</option>
-                                </select>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-vcenter card-table table-hover mb-0" id="newProductRecipeTable">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="min-width: 220px;">Materia Prima / Insumo</th>
+                                                <th style="width: 140px;">Cant. Requerida</th>
+                                                <th style="width: 120px;">Unidad</th>
+                                                <th style="width: 130px;" title="Si falta este insumo, el platillo figurará Agotado en la tienda">¿Es Crítico?</th>
+                                                <th style="width: 140px;">Costo Insumo</th>
+                                                <th style="width: 60px;" class="text-center">Quitar</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="newProductIngredientsList">
+                                            <!-- Filas dinámicas generadas por JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                            <div class="col-12">
-                                <label class="form-label" for="addProdDescripcion">Descripción</label>
-                                <textarea id="addProdDescripcion" class="form-control" rows="2" placeholder="Descripción técnica del producto..."></textarea>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label" for="addProdImagen">URL de Imagen</label>
-                                <input type="url" id="addProdImagen" class="form-control" placeholder="https://images.unsplash.com/..."/>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="addProdDestacado"/>
-                                    <span class="form-check-label">Producto Destacado <i class="ti ti-star text-yellow ms-1"></i></span>
-                                </label>
+                            <!-- RESUMEN DE COSTO Y MARGEN DE LA RECETA -->
+                            <div class="card-footer bg-light py-2">
+                                <div class="row align-items-center g-2 text-center text-md-start">
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-muted small">Costo de Insumos (BOM):</div>
+                                        <div class="fw-bold text-dark fs-4" id="newProdFoodCost">$0.00</div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-muted small">Margen Bruto Estimado:</div>
+                                        <div class="fw-bold text-green fs-4" id="newProdMargen">—</div>
+                                    </div>
+                                    <div class="col-12 col-md-6 text-md-end">
+                                        <div class="text-muted small">Porciones preparables con el stock actual en bodega:</div>
+                                        <span class="badge bg-purple text-white fs-5 px-3 py-1" id="newProdPorcionesEst">0 porciones disponibles</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-primary">
-                            <i class="ti ti-plus me-1"></i> Agregar Producto
+                            <i class="ti ti-check me-1"></i> Guardar Platillo y Activar en Menú
                         </button>
                     </div>
                 </form>
@@ -1072,6 +1138,9 @@
                         </div>
                     </div>
                     <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-cyan me-auto" onclick="Admin.openRecipeFromEdit()">
+                            <i class="ti ti-receipt-2 me-1"></i> Ver/Editar Ficha Técnica (Receta BOM)
+                        </button>
                         <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-primary">
                             <i class="ti ti-check me-1"></i> Guardar Cambios
